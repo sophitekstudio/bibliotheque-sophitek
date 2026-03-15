@@ -1,0 +1,8 @@
+# Fichiers privés - jamais uploader sur GitHub
+.env
+data/
+sophitek.log
+*.db
+__pycache__/
+*.pyc
+site/data.json
