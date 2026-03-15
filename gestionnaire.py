@@ -1,22 +1,44 @@
 """
 ╔══════════════════════════════════════════════════════════════╗
-║       SOPHITEK STUDIO — GESTIONNAIRE v2                      ║
+║       SOPHITEK STUDIO — GESTIONNAIRE v2 (RENDER READY)      ║
 ║       Auteur : Japhet Arcade Sophiano ASSOGBA                ║
-║       Toutes fonctionnalités incluses                        ║
+║       Compatible Render + Interface graphique locale         ║
 ╚══════════════════════════════════════════════════════════════╝
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, scrolledtext
-from flask import Flask, request, jsonify, redirect
-import sqlite3, hashlib, os, shutil, json, threading, logging
-import requests as req
+import os
+import sys
+import sqlite3
+import hashlib
+import shutil
+import json
+import threading
+import logging
+import base64
+import webbrowser
 from datetime import datetime
 from pathlib import Path
-import base64, webbrowser
+from functools import wraps
 
-# ── CHARGEMENT DES VARIABLES D'ENVIRONNEMENT ──
+# ── DÉTECTION DE L'ENVIRONNEMENT ──────────────────────────────────────
+ON_RENDER = os.environ.get('RENDER', False) or os.path.exists('/etc/render')
+
+# Imports conditionnels (évite tkinter sur Render)
+if not ON_RENDER:
+    import tkinter as tk
+    from tkinter import ttk, messagebox, filedialog
+    import requests as req
+else:
+    import requests as req
+    # Sur Render, on définit des placeholders pour éviter les erreurs
+    tk = None
+    ttk = None
+    messagebox = None
+    filedialog = None
+
+# ── CHARGEMENT DES VARIABLES D'ENVIRONNEMENT ─────────────────────────
 def _load_env():
+    """Charge les variables depuis .env si le fichier existe"""
     env_path = Path(__file__).parent / ".env"
     if env_path.exists():
         with open(env_path, encoding="utf-8") as f:
@@ -25,25 +47,26 @@ def _load_env():
                 if line and not line.startswith("#") and "=" in line:
                     key, _, val = line.partition("=")
                     os.environ.setdefault(key.strip(), val.strip())
+
 _load_env()
 
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
 # CONFIGURATION
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
 CONFIG = {
     "GITHUB_TOKEN": os.environ.get("GITHUB_TOKEN", ""),
     "GITHUB_REPO":  "sophitekstudio/bibliotheque-sophitek",
-    "RENDER_URL":   "https://bibliotheque-sophitek.onrender.com",
-    "WHATSAPP":     "2290143678355",
+    "RENDER_URL":   os.environ.get("RENDER_URL", "https://bibliotheque-sophitek.onrender.com"),
+    "WHATSAPP":     os.environ.get("WHATSAPP", "2290143678355"),
     "PRIX_DEFAUT":  1000,
-    "ADMIN_KEY":    "sophitek2026",
-    "PORT":         5000,
-    "SITE_URL":     "https://sophitekstudio.github.io/bibliotheque-sophitek/",
+    "ADMIN_KEY":    os.environ.get("ADMIN_KEY", "sophitek2026"),
+    "PORT":         int(os.environ.get("PORT", 5000)),
+    "SITE_URL":     os.environ.get("SITE_URL", "https://sophitekstudio.github.io/bibliotheque-sophitek/"),
 }
 
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
 # CHEMINS
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
 BASE_DIR   = Path(__file__).parent
 SITE_DIR   = BASE_DIR / "site"
 COVERS_DIR = SITE_DIR / "covers"
@@ -51,21 +74,27 @@ DB_PATH    = BASE_DIR / "data" / "sophitek.db"
 JSON_PATH  = SITE_DIR / "data.json"
 HTML_PATH  = SITE_DIR / "index.html"
 
+# Création des dossiers nécessaires
 COVERS_DIR.mkdir(parents=True, exist_ok=True)
 (BASE_DIR / "data").mkdir(parents=True, exist_ok=True)
+SITE_DIR.mkdir(parents=True, exist_ok=True)
 
+# Configuration du logging
 logging.basicConfig(
     filename=str(BASE_DIR / "sophitek.log"),
     level=logging.INFO,
     format="%(asctime)s — %(levelname)s — %(message)s"
 )
 
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
 # BASE DE DONNÉES
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
 def init_db():
+    """Initialise la base de données SQLite"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    
+    # Table des contenus (livres, apps, audios, vidéos)
     c.execute("""CREATE TABLE IF NOT EXISTS contenus (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         type        TEXT DEFAULT 'livre',
@@ -82,6 +111,8 @@ def init_db():
         actif       INTEGER DEFAULT 1,
         date_ajout  TEXT DEFAULT ''
     )""")
+    
+    # Table des commentaires
     c.execute("""CREATE TABLE IF NOT EXISTS commentaires (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         contenu_id INTEGER NOT NULL,
@@ -90,6 +121,8 @@ def init_db():
         date_com   TEXT DEFAULT '',
         approuve   INTEGER DEFAULT 1
     )""")
+    
+    # Table des commandes
     c.execute("""CREATE TABLE IF NOT EXISTS commandes (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         contenu_id INTEGER,
@@ -100,14 +133,18 @@ def init_db():
         telecharge INTEGER DEFAULT 0,
         date_cmd   TEXT DEFAULT ''
     )""")
-    conn.commit(); conn.close()
+    
+    conn.commit()
+    conn.close()
 
 def get_db():
+    """Retourne une connexion à la base de données"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 def get_contenus(type_filtre=None):
+    """Récupère tous les contenus actifs, éventuellement filtrés par type"""
     conn = get_db()
     if type_filtre:
         rows = conn.execute(
@@ -120,6 +157,7 @@ def get_contenus(type_filtre=None):
     return [dict(r) for r in rows]
 
 def get_commentaires(contenu_id):
+    """Récupère les commentaires approuvés pour un contenu"""
     conn = get_db()
     rows = conn.execute(
         "SELECT * FROM commentaires WHERE contenu_id=? AND approuve=1 ORDER BY id DESC",
@@ -127,48 +165,60 @@ def get_commentaires(contenu_id):
     conn.close()
     return [dict(r) for r in rows]
 
-def add_contenu(d):
+def add_contenu(data):
+    """Ajoute un nouveau contenu"""
     conn = get_db()
     c = conn.execute("""INSERT INTO contenus
-        (type,titre,auteur,genre,description,extrait,prix,gratuit,
-         couverture,lien_drive,lien_media,date_ajout)
+        (type, titre, auteur, genre, description, extrait, prix, gratuit,
+         couverture, lien_drive, lien_media, date_ajout)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (d["type"],d["titre"],d["auteur"],d["genre"],d["description"],
-         d["extrait"],d["prix"],d["gratuit"],d["couverture"],
-         d["lien_drive"],d["lien_media"],
+        (data["type"], data["titre"], data["auteur"], data["genre"],
+         data["description"], data["extrait"], data["prix"], data["gratuit"],
+         data["couverture"], data["lien_drive"], data["lien_media"],
          datetime.now().strftime("%Y-%m-%d")))
-    lid = c.lastrowid; conn.commit(); conn.close()
-    logging.info(f"Contenu ajouté : {d['titre']} ({d['type']})")
+    lid = c.lastrowid
+    conn.commit()
+    conn.close()
+    logging.info(f"Contenu ajouté : {data['titre']} ({data['type']})")
     return lid
 
-def update_contenu(lid, d):
+def update_contenu(lid, data):
+    """Met à jour un contenu existant"""
     conn = get_db()
     conn.execute("""UPDATE contenus SET
-        type=?,titre=?,auteur=?,genre=?,description=?,extrait=?,prix=?,
-        gratuit=?,couverture=?,lien_drive=?,lien_media=? WHERE id=?""",
-        (d["type"],d["titre"],d["auteur"],d["genre"],d["description"],
-         d["extrait"],d["prix"],d["gratuit"],d["couverture"],
-         d["lien_drive"],d["lien_media"],lid))
-    conn.commit(); conn.close()
+        type=?, titre=?, auteur=?, genre=?, description=?, extrait=?, prix=?,
+        gratuit=?, couverture=?, lien_drive=?, lien_media=? WHERE id=?""",
+        (data["type"], data["titre"], data["auteur"], data["genre"],
+         data["description"], data["extrait"], data["prix"], data["gratuit"],
+         data["couverture"], data["lien_drive"], data["lien_media"], lid))
+    conn.commit()
+    conn.close()
 
 def delete_contenu(lid):
+    """Désactive un contenu (suppression logique)"""
     conn = get_db()
     conn.execute("UPDATE contenus SET actif=0 WHERE id=?", (lid,))
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
 
 def add_commentaire(contenu_id, nom, texte):
+    """Ajoute un commentaire"""
     conn = get_db()
-    conn.execute("""INSERT INTO commentaires (contenu_id,nom,texte,date_com)
+    conn.execute("""INSERT INTO commentaires (contenu_id, nom, texte, date_com)
         VALUES(?,?,?,?)""",
         (contenu_id, nom, texte, datetime.now().strftime("%Y-%m-%d %H:%M")))
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
 
 def delete_commentaire(com_id):
+    """Supprime un commentaire"""
     conn = get_db()
     conn.execute("DELETE FROM commentaires WHERE id=?", (com_id,))
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
 
 def get_stats():
+    """Récupère les statistiques"""
     conn = get_db()
     total   = conn.execute("SELECT COUNT(*) FROM contenus WHERE actif=1").fetchone()[0]
     gratuit = conn.execute("SELECT COUNT(*) FROM contenus WHERE actif=1 AND gratuit=1").fetchone()[0]
@@ -176,13 +226,48 @@ def get_stats():
     revenus = conn.execute("SELECT SUM(montant) FROM commandes WHERE statut='paye'").fetchone()[0] or 0
     coms    = conn.execute("SELECT COUNT(*) FROM commentaires WHERE approuve=1").fetchone()[0]
     conn.close()
-    return {"total":total,"gratuit":gratuit,"ventes":ventes,"revenus":revenus,"commentaires":coms}
+    return {
+        "total": total,
+        "gratuit": gratuit,
+        "ventes": ventes,
+        "revenus": revenus,
+        "commentaires": coms
+    }
 
-# ════════════════════════════════════════════════════════════════
+def ajouter_commande(contenu_id, telephone, montant):
+    """Crée une nouvelle commande"""
+    conn = get_db()
+    token = hashlib.sha256(f"{contenu_id}{telephone}{datetime.now()}".encode()).hexdigest()[:16]
+    c = conn.execute("""INSERT INTO commandes
+        (contenu_id, telephone, montant, token_dl, date_cmd)
+        VALUES(?,?,?,?,?)""",
+        (contenu_id, telephone, montant, token, datetime.now().isoformat()))
+    cmd_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return cmd_id, token
+
+def valider_paiement(commande_id):
+    """Valide un paiement (simulation)"""
+    conn = get_db()
+    conn.execute("UPDATE commandes SET statut='paye' WHERE id=?", (commande_id,))
+    conn.commit()
+    conn.close()
+
+def get_commande(commande_id):
+    """Récupère une commande"""
+    conn = get_db()
+    row = conn.execute("SELECT * FROM commandes WHERE id=?", (commande_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+# ═════════════════════════════════════════════════════════════════════
 # GÉNÉRATEUR HTML
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
 def generer_html(contenus):
+    """Génère le HTML du site à partir des contenus"""
     cartes = ""
+    
     for b in contenus:
         cover = f"covers/{Path(b['couverture']).name}" if b["couverture"] else "covers/placeholder.jpg"
         badge = "GRATUIT" if b["gratuit"] else (f"{b['prix']} FCFA" if b["prix"] else "")
@@ -233,10 +318,11 @@ def generer_html(contenus):
 
         type_icon = {"livre":"📚","app":"💻","audio":"🎵","video":"🎬","autre":"📦"}.get(b["type"],"📦")
 
+        badge_html = f'<span class="badge {badge_cls}">{badge}</span>' if badge else ""
+
         cartes += f"""<div class="card" data-type="{b['type']}" data-id="{b['id']}">
           <div class="cover-wrap">
             <img src="{cover}" alt="{b['titre']}" loading="lazy"/>
-            badge_html = f'<span class="badge {badge_cls}">{badge}</span>' if badge else ""
             {badge_html}
             <span class="type-icon">{type_icon}</span>
           </div>
@@ -583,109 +669,148 @@ document.addEventListener('keydown',e=>{{
 </script>
 </body></html>"""
 
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
 # GITHUB
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
 def github_push(contenu_bytes, chemin_repo, message):
+    """Pousse un fichier vers GitHub"""
     token   = CONFIG["GITHUB_TOKEN"]
     repo    = CONFIG["GITHUB_REPO"]
     url     = f"https://api.github.com/repos/{repo}/contents/{chemin_repo}"
-    headers = {"Authorization": f"token {token}",
-               "Accept": "application/vnd.github+json"}
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github+json"
+    }
+    
+    if not token:
+        return False, "Token GitHub manquant"
+    
     b64 = base64.b64encode(contenu_bytes).decode()
+    
+    # Vérifier si le fichier existe déjà pour obtenir le SHA
     sha = None
-    r = req.get(url, headers=headers, timeout=15)
-    if r.status_code == 200:
-        sha = r.json().get("sha")
+    try:
+        r = req.get(url, headers=headers, timeout=15)
+        if r.status_code == 200:
+            sha = r.json().get("sha")
+    except Exception as e:
+        return False, f"Erreur de vérification : {str(e)}"
+    
     payload = {"message": message, "content": b64}
     if sha:
         payload["sha"] = sha
-    r = req.put(url, json=payload, headers=headers, timeout=20)
-    if r.status_code in (200, 201):
-        return True, f"✓ {chemin_repo}"
-    return False, f"✗ {chemin_repo} : {r.json().get('message','Erreur')}"
+    
+    try:
+        r = req.put(url, json=payload, headers=headers, timeout=20)
+        if r.status_code in (200, 201):
+            return True, f"✓ {chemin_repo}"
+        else:
+            error_msg = r.json().get('message', 'Erreur inconnue')
+            return False, f"✗ {chemin_repo} : {error_msg}"
+    except Exception as e:
+        return False, f"✗ {chemin_repo} : {str(e)}"
 
 def github_get(chemin_repo):
+    """Récupère un fichier depuis GitHub"""
     token   = CONFIG["GITHUB_TOKEN"]
     repo    = CONFIG["GITHUB_REPO"]
     url     = f"https://api.github.com/repos/{repo}/contents/{chemin_repo}"
-    headers = {"Authorization": f"token {token}",
-               "Accept": "application/vnd.github+json"}
-    r = req.get(url, headers=headers, timeout=15)
-    if r.status_code == 200:
-        content = r.json().get("content","")
-        return base64.b64decode(content)
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github+json"
+    }
+    
+    if not token:
+        return None
+    
+    try:
+        r = req.get(url, headers=headers, timeout=15)
+        if r.status_code == 200:
+            content = r.json().get("content", "")
+            return base64.b64decode(content)
+    except Exception:
+        pass
     return None
 
 def publier_site(callback):
+    """Publie le site sur GitHub Pages"""
     contenus = get_contenus()
     msgs, errors = [], []
-    # HTML
+    
+    # Générer et pousser HTML
     html = generer_html(contenus)
     HTML_PATH.write_text(html, encoding="utf-8")
     ok, msg = github_push(html.encode("utf-8"), "index.html",
                           f"Mise à jour — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     (msgs if ok else errors).append(msg)
-    # JSON
-    data = [{**b,"gratuit":bool(b["gratuit"])} for b in contenus]
+    
+    # Générer et pousser JSON
+    data = [{**b, "gratuit": bool(b["gratuit"])} for b in contenus]
     json_str = json.dumps(data, ensure_ascii=False, indent=2)
     JSON_PATH.write_text(json_str, encoding="utf-8")
     ok, msg = github_push(json_str.encode("utf-8"), "data.json",
                           f"Données — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     (msgs if ok else errors).append(msg)
-    # Couvertures
+    
+    # Pousser les couvertures
     for cover in COVERS_DIR.iterdir():
-        if cover.is_file() and cover.suffix.lower() in (".jpg",".jpeg",".png",".webp"):
+        if cover.is_file() and cover.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"):
             ok, msg = github_push(cover.read_bytes(), f"covers/{cover.name}",
                                   f"Cover : {cover.name}")
             (msgs if ok else errors).append(msg)
+    
     logging.info(f"Publication : {len(msgs)} succès, {len(errors)} erreurs")
     callback(msgs, errors)
 
 def synchroniser(callback):
-    """Télécharge data.json depuis GitHub et met à jour la DB locale."""
+    """Télécharge data.json depuis GitHub et met à jour la DB locale"""
     try:
         data_bytes = github_get("data.json")
         if not data_bytes:
             callback(False, "Fichier data.json introuvable sur GitHub")
             return
+        
         data = json.loads(data_bytes.decode("utf-8"))
         conn = get_db()
+        
         for b in data:
             exists = conn.execute(
                 "SELECT id FROM contenus WHERE id=?", (b["id"],)).fetchone()
+            
             if exists:
                 conn.execute("""UPDATE contenus SET
-                    type=?,titre=?,auteur=?,genre=?,description=?,extrait=?,
-                    prix=?,gratuit=?,couverture=?,lien_drive=?,lien_media=?,actif=?
+                    type=?, titre=?, auteur=?, genre=?, description=?, extrait=?,
+                    prix=?, gratuit=?, couverture=?, lien_drive=?, lien_media=?, actif=?
                     WHERE id=?""",
-                    (b.get("type","livre"),b["titre"],b.get("auteur",""),
-                     b.get("genre",""),b.get("description",""),b.get("extrait",""),
-                     b.get("prix",0),int(b.get("gratuit",False)),
-                     b.get("couverture",""),b.get("lien_drive",""),
-                     b.get("lien_media",""),b.get("actif",1),b["id"]))
+                    (b.get("type", "livre"), b["titre"], b.get("auteur", ""),
+                     b.get("genre", ""), b.get("description", ""), b.get("extrait", ""),
+                     b.get("prix", 0), int(b.get("gratuit", False)),
+                     b.get("couverture", ""), b.get("lien_drive", ""),
+                     b.get("lien_media", ""), b.get("actif", 1), b["id"]))
             else:
                 conn.execute("""INSERT OR IGNORE INTO contenus
-                    (id,type,titre,auteur,genre,description,extrait,prix,gratuit,
-                     couverture,lien_drive,lien_media,actif,date_ajout)
+                    (id, type, titre, auteur, genre, description, extrait, prix, gratuit,
+                     couverture, lien_drive, lien_media, actif, date_ajout)
                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (b["id"],b.get("type","livre"),b["titre"],b.get("auteur",""),
-                     b.get("genre",""),b.get("description",""),b.get("extrait",""),
-                     b.get("prix",0),int(b.get("gratuit",False)),
-                     b.get("couverture",""),b.get("lien_drive",""),
-                     b.get("lien_media",""),b.get("actif",1),
-                     b.get("date_ajout","")))
-        conn.commit(); conn.close()
+                    (b["id"], b.get("type", "livre"), b["titre"], b.get("auteur", ""),
+                     b.get("genre", ""), b.get("description", ""), b.get("extrait", ""),
+                     b.get("prix", 0), int(b.get("gratuit", False)),
+                     b.get("couverture", ""), b.get("lien_drive", ""),
+                     b.get("lien_media", ""), b.get("actif", 1),
+                     b.get("date_ajout", "")))
+        
+        conn.commit()
+        conn.close()
         logging.info(f"Synchronisation : {len(data)} contenus mis à jour")
         callback(True, f"✓ {len(data)} contenus synchronisés depuis GitHub")
+    
     except Exception as e:
         logging.error(f"Erreur synchro : {e}")
         callback(False, str(e))
 
 def sauvegarder_drive():
-    """Sauvegarde le fichier Python sur Google Drive via l'API."""
+    """Sauvegarde le fichier Python sur GitHub"""
     try:
-        # Sauvegarder via GitHub (chemin backup)
         script = Path(__file__).read_bytes()
         ok, msg = github_push(script, "backup/gestionnaire.py",
                               f"Backup — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
@@ -693,29 +818,37 @@ def sauvegarder_drive():
     except Exception as e:
         return False, str(e)
 
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
 # FLASK
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
+from flask import Flask, request, jsonify, redirect, send_file
+
 flask_app = Flask(__name__)
 
 @flask_app.route("/")
 def api_home():
-    return jsonify({"status": "Sophitek Studio", "version": "2.0"})
+    return jsonify({
+        "status": "Sophitek Studio",
+        "version": "2.0",
+        "message": "API de la boutique Sophitek"
+    })
 
 @flask_app.route("/contenus")
 def api_contenus():
     t = request.args.get("type")
     contenus = get_contenus(t)
-    return jsonify([{**b,"gratuit":bool(b["gratuit"])} for b in contenus])
+    return jsonify([{**b, "gratuit": bool(b["gratuit"])} for b in contenus])
 
 @flask_app.route("/commentaire", methods=["POST"])
 def api_commentaire():
     d = request.get_json(silent=True) or {}
-    cid  = d.get("contenu_id")
-    nom  = str(d.get("nom","")).strip()[:60]
-    txt  = str(d.get("texte","")).strip()[:500]
+    cid = d.get("contenu_id")
+    nom = str(d.get("nom", "")).strip()[:60]
+    txt = str(d.get("texte", "")).strip()[:500]
+    
     if not cid or not nom or not txt:
-        return jsonify({"erreur":"Données manquantes"}), 400
+        return jsonify({"erreur": "Données manquantes"}), 400
+    
     add_commentaire(cid, nom, txt)
     return jsonify({"success": True})
 
@@ -723,412 +856,514 @@ def api_commentaire():
 def api_acheter(cid):
     conn = get_db()
     item = conn.execute(
-        "SELECT * FROM contenus WHERE id=? AND actif=1",(cid,)).fetchone()
+        "SELECT * FROM contenus WHERE id=? AND actif=1", (cid,)).fetchone()
     conn.close()
+    
     if not item:
-        return jsonify({"erreur":"Introuvable"}), 404
+        return jsonify({"erreur": "Contenu introuvable"}), 404
+    
     item = dict(item)
-    d    = request.get_json(silent=True) or {}
-    tel  = str(d.get("telephone","")).strip()
+    d = request.get_json(silent=True) or {}
+    tel = str(d.get("telephone", "")).strip()
+    
     if not tel or len(tel) < 8:
-        return jsonify({"erreur":"Numéro invalide"}), 400
-    conn = get_db()
-    c = conn.execute("""INSERT INTO commandes
-        (contenu_id,telephone,montant,statut,date_cmd)
-        VALUES(?,?,?,'en_attente',?)""",
-        (cid, tel, item["prix"], datetime.now().isoformat()))
-    cmd_id = c.lastrowid; conn.commit(); conn.close()
-    # Ici on intégrera FedaPay quand tu auras ton IFU
-    # Pour l'instant : simulation (à remplacer)
-    return jsonify({"success": True, "commande_id": cmd_id,
-                    "message": f"Commande créée. En attente de paiement."})
+        return jsonify({"erreur": "Numéro invalide"}), 400
+    
+    cmd_id, token = ajouter_commande(cid, tel, item["prix"])
+    
+    return jsonify({
+        "success": True,
+        "commande_id": cmd_id,
+        "message": "Commande créée. En attente de paiement."
+    })
 
 @flask_app.route("/verifier/<int:cmd_id>")
 def api_verifier(cmd_id):
-    conn = get_db()
-    cmd = conn.execute(
-        "SELECT * FROM commandes WHERE id=?",(cmd_id,)).fetchone()
-    conn.close()
-    if not cmd: return jsonify({"erreur":"Introuvable"}), 404
-    cmd = dict(cmd)
+    cmd = get_commande(cmd_id)
+    
+    if not cmd:
+        return jsonify({"erreur": "Commande introuvable"}), 404
+    
     if cmd["statut"] == "paye" and cmd["token_dl"]:
-        return jsonify({"statut":"paye",
-                        "lien":f"{CONFIG['RENDER_URL']}/dl/{cmd['token_dl']}"})
+        return jsonify({
+            "statut": "paye",
+            "lien": f"{CONFIG['RENDER_URL']}/dl/{cmd['token_dl']}"
+        })
     elif cmd["statut"] == "echec":
-        return jsonify({"statut":"echec"})
-    return jsonify({"statut":"en_attente"})
+        return jsonify({"statut": "echec"})
+    
+    return jsonify({"statut": "en_attente"})
 
 @flask_app.route("/dl/<token>")
 def api_dl(token):
     conn = get_db()
-    row = conn.execute("""SELECT c.*,co.lien_drive FROM commandes c
+    row = conn.execute("""SELECT c.*, co.lien_drive FROM commandes c
         JOIN contenus co ON c.contenu_id=co.id
-        WHERE c.token_dl=?""",(token,)).fetchone()
+        WHERE c.token_dl=?""", (token,)).fetchone()
     conn.close()
+    
     if not row:
-        return "<h2 style='color:red;text-align:center;padding:60px;font-family:Georgia'>Lien invalide</h2>",404
+        return "<h2 style='color:red;text-align:center;padding:60px;font-family:Georgia'>Lien invalide</h2>", 404
+    
     row = dict(row)
+    
     if row["telecharge"] >= 1:
-        return "<h2 style='color:red;text-align:center;padding:60px;font-family:Georgia'>Lien déjà utilisé</h2>",400
+        return "<h2 style='color:red;text-align:center;padding:60px;font-family:Georgia'>Lien déjà utilisé</h2>", 400
+    
     conn = get_db()
-    conn.execute("UPDATE commandes SET telecharge=telecharge+1 WHERE token_dl=?",(token,))
-    conn.commit(); conn.close()
+    conn.execute("UPDATE commandes SET telecharge=telecharge+1 WHERE token_dl=?", (token,))
+    conn.commit()
+    conn.close()
+    
     return redirect(row["lien_drive"])
 
 @flask_app.route("/admin/stats")
 def api_stats():
     if request.args.get("key") != CONFIG["ADMIN_KEY"]:
-        return jsonify({"erreur":"Non autorisé"}), 403
+        return jsonify({"erreur": "Non autorisé"}), 403
     return jsonify(get_stats())
 
-def demarrer_flask():
-    flask_app.run(host="0.0.0.0", port=CONFIG["PORT"],
-                  debug=False, use_reloader=False)
+@flask_app.route("/webhook/paiement", methods=["POST"])
+def webhook_paiement():
+    """Simule un webhook de confirmation de paiement"""
+    data = request.get_json(silent=True) or {}
+    commande_id = data.get("commande_id")
+    
+    if commande_id:
+        valider_paiement(commande_id)
+        return jsonify({"success": True})
+    
+    return jsonify({"erreur": "Données manquantes"}), 400
 
-# ════════════════════════════════════════════════════════════════
-# INTERFACE TKINTER
-# ════════════════════════════════════════════════════════════════
-N="#0a0a0a"; G="#1a1a1a"; G2="#2a2a2a"; G3="#333"
-R="#c0392b"; B="#f5f0e8"; T="#d4cfc7"; V="#27ae60"; OR="#b8960c"; BL="#2980b9"
-
-TYPES = [("livre","📚 Livre"),("app","💻 Application"),
-         ("audio","🎵 Audio"),("video","🎬 Vidéo"),("autre","📦 Autre")]
-
-class App:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Sophitek Studio v2 — Gestionnaire")
-        self.root.geometry("1150x720")
-        self.root.configure(bg=N)
-        self.sel_id   = None
-        self.cover_var = tk.StringVar()
-        init_db()
-        self._ui()
-        self._charger()
-        threading.Thread(target=demarrer_flask, daemon=True).start()
-
-    def _btn(self, p, txt, cmd, bg, sz=11, fg=None):
-        return tk.Button(p, text=txt, command=cmd, bg=bg, fg=fg or B,
-                         font=("Courier",sz,"bold"), borderwidth=0,
-                         padx=8, pady=5, cursor="hand2",
-                         activebackground=R, activeforeground=B)
-
-    def _entry(self, parent, key, label, multi=False):
-        row = tk.Frame(parent, bg=N)
-        row.pack(fill="x", padx=12, pady=3)
-        tk.Label(row, text=label, font=("Courier",9),
-                 fg=T, bg=N, anchor="w").pack(fill="x")
-        if multi:
-            w = tk.Text(row, height=3, bg=G2, fg=B, insertbackground=B,
-                        font=("Georgia",11), borderwidth=0, padx=6, pady=4)
-        else:
-            w = tk.Entry(row, bg=G2, fg=B, insertbackground=B,
-                         font=("Georgia",12), borderwidth=0,
-                         highlightthickness=1,
-                         highlightbackground=G2, highlightcolor=R)
-        w.pack(fill="x", ipady=0 if multi else 4)
-        self.flds[key] = w
-
-    def _ui(self):
-        # Header
-        hdr = tk.Frame(self.root, bg=G, pady=10)
-        hdr.pack(fill="x")
-        tk.Label(hdr, text="SOPHITEK STUDIO v2",
-                 font=("Courier",10), fg=R, bg=G).pack()
-        tk.Label(hdr, text="Gestionnaire de Boutique",
-                 font=("Georgia",16,"bold"), fg=B, bg=G).pack()
-
-        body = tk.Frame(self.root, bg=N)
-        body.pack(fill="both", expand=True, padx=10, pady=8)
-
-        # ── GAUCHE — Liste
-        left = tk.Frame(body, bg=G2, width=280)
-        left.pack(side="left", fill="y", padx=(0,10))
-        left.pack_propagate(False)
-
-        tk.Label(left, text="📦  CONTENUS", font=("Courier",10,"bold"),
-                 fg=R, bg=G2, pady=6).pack(fill="x", padx=8)
-        self.stats_lbl = tk.Label(left, text="", font=("Courier",8),
-                                   fg=T, bg=G2, anchor="w")
-        self.stats_lbl.pack(fill="x", padx=8, pady=(0,4))
-
-        # Filtre type dans liste
-        ff = tk.Frame(left, bg=G2)
-        ff.pack(fill="x", padx=6, pady=4)
-        self.type_filtre = tk.StringVar(value="tous")
-        types_opts = [("Tous","tous")] + [(t[1],t[0]) for t in TYPES]
-        for lbl, val in types_opts:
-            tk.Radiobutton(ff, text=lbl, variable=self.type_filtre,
-                           value=val, command=self._charger,
-                           bg=G2, fg=T, selectcolor=R,
-                           activebackground=G2,
-                           font=("Courier",8)).pack(anchor="w", padx=4)
-
-        sf = tk.Frame(left, bg=G2)
-        sf.pack(fill="both", expand=True, padx=6)
-        sb = ttk.Scrollbar(sf); sb.pack(side="right", fill="y")
-        self.lb = tk.Listbox(sf, bg=G, fg=B, selectbackground=R,
-                              font=("Georgia",11), borderwidth=0,
-                              highlightthickness=0, activestyle="none",
-                              yscrollcommand=sb.set, cursor="hand2")
-        self.lb.pack(side="left", fill="both", expand=True)
-        sb.config(command=self.lb.yview)
-        self.lb.bind("<<ListboxSelect>>", self._on_sel)
-
-        bf = tk.Frame(left, bg=G2, pady=4)
-        bf.pack(fill="x", padx=6)
-        self._btn(bf,"＋ Nouveau",  self._nouveau,   V,10).pack(fill="x",pady=2)
-        self._btn(bf,"✕ Supprimer", self._supprimer, R,10).pack(fill="x",pady=2)
-        self._btn(bf,"🗨 Commentaires", self._voir_coms, BL,10).pack(fill="x",pady=2)
-
-        # ── DROITE — Formulaire + Actions
-        right = tk.Frame(body, bg=N)
-        right.pack(side="left", fill="both", expand=True)
-
-        frm = tk.LabelFrame(right, text="  DÉTAILS DU CONTENU  ",
-                             font=("Courier",10), fg=R, bg=N,
-                             bd=1, relief="solid", labelanchor="n")
-        frm.pack(fill="both", expand=True, pady=(0,6))
-
-        # Type
-        tr = tk.Frame(frm, bg=N)
-        tr.pack(fill="x", padx=12, pady=4)
-        tk.Label(tr, text="Type *", font=("Courier",9),
-                 fg=T, bg=N, anchor="w").pack(fill="x")
-        self.type_var = tk.StringVar(value="livre")
-        type_row = tk.Frame(tr, bg=N)
-        type_row.pack(fill="x")
-        for lbl, val in TYPES:
-            tk.Radiobutton(type_row, text=lbl, variable=self.type_var,
-                           value=val, bg=N, fg=B, selectcolor=R,
-                           activebackground=N,
-                           font=("Courier",9)).pack(side="left", padx=4)
-
-        self.flds = {}
-        self._entry(frm, "titre",       "Titre *")
-        self._entry(frm, "auteur",      "Auteur")
-        self._entry(frm, "genre",       "Genre / Catégorie")
-        self._entry(frm, "prix",        "Prix (FCFA) — 0 si gratuit")
-        self._entry(frm, "lien_drive",  "Lien Google Drive (téléchargement)")
-        self._entry(frm, "lien_media",  "Lien média (audio/vidéo YouTube ou Drive)")
-        self._entry(frm, "description", "Description", multi=True)
-        self._entry(frm, "extrait",     "Extrait lisible (texte)", multi=True)
-
-        ex = tk.Frame(frm, bg=N)
-        ex.pack(fill="x", padx=12, pady=4)
-        self.grat_var = tk.BooleanVar()
-        tk.Checkbutton(ex, text="✓ Accès gratuit",
-                       variable=self.grat_var,
-                       bg=N, fg=B, selectcolor=R,
-                       activebackground=N,
-                       font=("Courier",10)).pack(side="left")
-        self._btn(ex,"🖼 Couverture", self._couverture, G2,9).pack(side="left",padx=8)
-        tk.Label(ex, textvariable=self.cover_var,
-                 font=("Courier",8), fg=OR, bg=N).pack(side="left")
-
-        sr = tk.Frame(frm, bg=N, pady=5)
-        sr.pack(fill="x", padx=12)
-        self._btn(sr,"💾  ENREGISTRER", self._enregistrer, V,11).pack(side="left",padx=(0,6))
-        self._btn(sr,"✕  ANNULER",      self._vider,       G2,11).pack(side="left")
-
-        # ── ACTIONS
-        act = tk.LabelFrame(right, text="  ACTIONS  ",
-                             font=("Courier",10), fg=R, bg=N,
-                             bd=1, relief="solid", labelanchor="n")
-        act.pack(fill="x")
-        ai = tk.Frame(act, bg=N, pady=6)
-        ai.pack(fill="x", padx=10)
-        self._btn(ai,"🌐 PUBLIER",      self._publier,    R,  11).pack(side="left",padx=(0,6))
-        self._btn(ai,"⟳ SYNCHRONISER", self._synchroniser,BL, 11).pack(side="left",padx=(0,6))
-        self._btn(ai,"💾 SAUVEGARDER",  self._sauvegarder, OR, 11).pack(side="left",padx=(0,6))
-        self._btn(ai,"👁 APERÇU",       self._apercu,      G2, 11).pack(side="left",padx=(0,6))
-        self._btn(ai,"🔗 SITE EN LIGNE",self._ouvrir_site, G2, 11).pack(side="left")
-        self.act_lbl = tk.Label(act, text="", font=("Courier",9),
-                                fg=V, bg=N, pady=3)
-        self.act_lbl.pack()
-
-    # ── LISTE
-    def _charger(self):
-        self.lb.delete(0, tk.END)
-        t = self.type_filtre.get()
-        self.data = get_contenus(None if t == "tous" else t)
-        icons = {"livre":"📚","app":"💻","audio":"🎵","video":"🎬","autre":"📦"}
-        for b in self.data:
-            ic  = icons.get(b["type"],"📦")
-            tag = "🆓" if b["gratuit"] else f"{b['prix']}F"
-            self.lb.insert(tk.END, f"  {ic} {b['titre']}  [{tag}]")
-        s = get_stats()
-        self.stats_lbl.config(
-            text=f"  {s['total']} · {s['ventes']} ventes · {s['revenus']:,}F")
-
-    def _on_sel(self, _):
-        sel = self.lb.curselection()
-        if not sel: return
-        b = self.data[sel[0]]
-        self.sel_id = b["id"]
-        self._vider()
-        self.type_var.set(b.get("type","livre"))
-        for k in ["titre","auteur","genre","prix","lien_drive","lien_media"]:
-            self.flds[k].insert(0, str(b.get(k,"")))
-        self.flds["description"].insert("1.0", b.get("description",""))
-        self.flds["extrait"].insert("1.0", b.get("extrait",""))
-        self.grat_var.set(bool(b.get("gratuit",0)))
-        self.cover_var.set(b.get("couverture",""))
-
-    def _vider(self):
-        self.sel_id = None
-        for k,w in self.flds.items():
-            if isinstance(w, tk.Text): w.delete("1.0",tk.END)
-            else: w.delete(0, tk.END)
-        self.grat_var.set(False)
-        self.cover_var.set("")
-        self.type_var.set("livre")
-
-    def _get_data(self):
-        try: prix = int(self.flds["prix"].get().strip() or "0")
-        except: prix = 0
-        return {
-            "type":        self.type_var.get(),
-            "titre":       self.flds["titre"].get().strip(),
-            "auteur":      self.flds["auteur"].get().strip() or "Japhet Arcade Sophiano ASSOGBA",
-            "genre":       self.flds["genre"].get().strip(),
-            "description": self.flds["description"].get("1.0",tk.END).strip(),
-            "extrait":     self.flds["extrait"].get("1.0",tk.END).strip(),
-            "prix":        prix,
-            "gratuit":     int(self.grat_var.get()),
-            "couverture":  self.cover_var.get(),
-            "lien_drive":  self.flds["lien_drive"].get().strip(),
-            "lien_media":  self.flds["lien_media"].get().strip(),
-        }
-
-    # ── CRUD
-    def _nouveau(self):
-        self._vider(); self.flds["titre"].focus()
-
-    def _enregistrer(self):
-        d = self._get_data()
-        if not d["titre"]:
-            messagebox.showerror("Erreur","Le titre est obligatoire."); return
-        if self.sel_id:
-            update_contenu(self.sel_id, d)
-            messagebox.showinfo("✓", f"Modifié : {d['titre']}")
-        else:
-            add_contenu(d)
-            messagebox.showinfo("✓", f"Ajouté : {d['titre']}")
-        self._vider(); self._charger()
-
-    def _supprimer(self):
-        sel = self.lb.curselection()
-        if not sel or not self.sel_id:
-            messagebox.showinfo("Info","Sélectionne un contenu."); return
-        titre = self.data[sel[0]]["titre"]
-        if messagebox.askyesno("Confirmer", f"Supprimer « {titre} » ?"):
-            delete_contenu(self.sel_id)
-            self._vider(); self._charger()
-
-    def _couverture(self):
-        path = filedialog.askopenfilename(
-            title="Choisir une image",
-            filetypes=[("Images","*.jpg *.jpeg *.png *.webp")])
-        if path:
-            nom  = Path(path).name
-            dest = COVERS_DIR / nom
-            shutil.copy2(path, dest)
-            self.cover_var.set(f"covers/{nom}")
-
-    # ── COMMENTAIRES
-    def _voir_coms(self):
-        if not self.sel_id:
-            messagebox.showinfo("Info","Sélectionne un contenu d'abord."); return
-        win = tk.Toplevel(self.root)
-        win.title("Commentaires")
-        win.geometry("500x420")
-        win.configure(bg=N)
-        coms = get_commentaires(self.sel_id)
-        tk.Label(win, text=f"Commentaires ({len(coms)})",
-                 font=("Georgia",14,"bold"), fg=R, bg=N, pady=10).pack()
-        sf = tk.Frame(win, bg=N)
-        sf.pack(fill="both", expand=True, padx=10, pady=5)
-        sb = ttk.Scrollbar(sf); sb.pack(side="right", fill="y")
-        lb = tk.Listbox(sf, bg=G, fg=B, font=("Georgia",11),
-                        borderwidth=0, highlightthickness=0,
-                        yscrollcommand=sb.set)
-        lb.pack(side="left", fill="both", expand=True)
-        sb.config(command=lb.yview)
-        for c in coms:
-            lb.insert(tk.END, f"  {c['nom']} ({c['date_com'][:10]}) : {c['texte'][:60]}")
-        self.coms_data = coms
-        self.coms_lb   = lb
-        def supprimer_com():
-            sel = lb.curselection()
-            if not sel: return
-            com = coms[sel[0]]
-            if messagebox.askyesno("Confirmer", "Supprimer ce commentaire ?"):
-                delete_commentaire(com["id"])
-                lb.delete(sel[0])
-        self._btn(win,"✕ Supprimer commentaire",supprimer_com,R,11).pack(pady=6)
-
-    # ── ACTIONS
-    def _apercu(self):
-        contenus = get_contenus()
-        html = generer_html(contenus)
-        HTML_PATH.write_text(html, encoding="utf-8")
-        webbrowser.open(str(HTML_PATH))
-
-    def _ouvrir_site(self):
-        webbrowser.open(CONFIG["SITE_URL"])
-
-    def _publier(self):
-        self.act_lbl.config(text="⏳ Publication en cours...", fg=OR)
-        self.root.update()
-        def callback(msgs, errors):
-            if errors and not msgs:
-                self.act_lbl.config(text=f"✗ Échec : {errors[0]}", fg=R)
-                messagebox.showerror("Erreur", "\n".join(errors[:3]))
-            else:
-                self.act_lbl.config(
-                    text=f"✓ Publié ! {len(msgs)} fichier(s) mis à jour", fg=V)
-                messagebox.showinfo("✓ Succès !",
-                    f"Site mis à jour !\n\nVisible dans 1-2 min sur :\n{CONFIG['SITE_URL']}")
+# ═════════════════════════════════════════════════════════════════════
+# INTERFACE TKINTER (uniquement en local)
+# ═════════════════════════════════════════════════════════════════════
+if not ON_RENDER:
+    # Constantes de couleurs
+    N = "#0a0a0a"
+    G = "#1a1a1a"
+    G2 = "#2a2a2a"
+    G3 = "#333"
+    R = "#c0392b"
+    B = "#f5f0e8"
+    T = "#d4cfc7"
+    V = "#27ae60"
+    OR = "#b8960c"
+    BL = "#2980b9"
+    
+    TYPES = [
+        ("livre", "📚 Livre"),
+        ("app", "💻 Application"),
+        ("audio", "🎵 Audio"),
+        ("video", "🎬 Vidéo"),
+        ("autre", "📦 Autre")
+    ]
+    
+    class App:
+        def __init__(self, root):
+            self.root = root
+            self.root.title("Sophitek Studio v2 — Gestionnaire")
+            self.root.geometry("1150x720")
+            self.root.configure(bg=N)
+            self.sel_id = None
+            self.cover_var = tk.StringVar()
+            self.data = []
+            self.coms_data = []
+            self.coms_lb = None
+            self.flds = {}
+            
+            init_db()
+            self._ui()
             self._charger()
-        threading.Thread(target=publier_site,args=(callback,),daemon=True).start()
-
-    def _synchroniser(self):
-        if not messagebox.askyesno("Synchroniser",
-            "Mettre à jour l'app depuis GitHub ?\n"
-            "Les contenus locaux seront mis à niveau."):
-            return
-        self.act_lbl.config(text="⏳ Synchronisation...", fg=OR)
-        self.root.update()
-        def callback(ok, msg):
-            if ok:
-                self.act_lbl.config(text=msg, fg=V)
-                messagebox.showinfo("✓ Synchronisé", msg)
+            
+            # Démarrer Flask dans un thread séparé
+            threading.Thread(target=demarrer_flask, daemon=True).start()
+        
+        def _btn(self, p, txt, cmd, bg, sz=11, fg=None):
+            return tk.Button(p, text=txt, command=cmd, bg=bg, fg=fg or B,
+                             font=("Courier", sz, "bold"), borderwidth=0,
+                             padx=8, pady=5, cursor="hand2",
+                             activebackground=R, activeforeground=B)
+        
+        def _entry(self, parent, key, label, multi=False):
+            row = tk.Frame(parent, bg=N)
+            row.pack(fill="x", padx=12, pady=3)
+            tk.Label(row, text=label, font=("Courier", 9),
+                     fg=T, bg=N, anchor="w").pack(fill="x")
+            
+            if multi:
+                w = tk.Text(row, height=3, bg=G2, fg=B, insertbackground=B,
+                            font=("Georgia", 11), borderwidth=0, padx=6, pady=4)
+            else:
+                w = tk.Entry(row, bg=G2, fg=B, insertbackground=B,
+                             font=("Georgia", 12), borderwidth=0,
+                             highlightthickness=1,
+                             highlightbackground=G2, highlightcolor=R)
+            
+            w.pack(fill="x", ipady=0 if multi else 4)
+            self.flds[key] = w
+        
+        def _ui(self):
+            # Header
+            hdr = tk.Frame(self.root, bg=G, pady=10)
+            hdr.pack(fill="x")
+            tk.Label(hdr, text="SOPHITEK STUDIO v2",
+                     font=("Courier", 10), fg=R, bg=G).pack()
+            tk.Label(hdr, text="Gestionnaire de Boutique",
+                     font=("Georgia", 16, "bold"), fg=B, bg=G).pack()
+            
+            body = tk.Frame(self.root, bg=N)
+            body.pack(fill="both", expand=True, padx=10, pady=8)
+            
+            # ── GAUCHE — Liste
+            left = tk.Frame(body, bg=G2, width=280)
+            left.pack(side="left", fill="y", padx=(0, 10))
+            left.pack_propagate(False)
+            
+            tk.Label(left, text="📦  CONTENUS", font=("Courier", 10, "bold"),
+                     fg=R, bg=G2, pady=6).pack(fill="x", padx=8)
+            
+            self.stats_lbl = tk.Label(left, text="", font=("Courier", 8),
+                                      fg=T, bg=G2, anchor="w")
+            self.stats_lbl.pack(fill="x", padx=8, pady=(0, 4))
+            
+            # Filtre type dans liste
+            ff = tk.Frame(left, bg=G2)
+            ff.pack(fill="x", padx=6, pady=4)
+            self.type_filtre = tk.StringVar(value="tous")
+            types_opts = [("Tous", "tous")] + [(t[1], t[0]) for t in TYPES]
+            
+            for lbl, val in types_opts:
+                tk.Radiobutton(ff, text=lbl, variable=self.type_filtre,
+                               value=val, command=self._charger,
+                               bg=G2, fg=T, selectcolor=R,
+                               activebackground=G2,
+                               font=("Courier", 8)).pack(anchor="w", padx=4)
+            
+            sf = tk.Frame(left, bg=G2)
+            sf.pack(fill="both", expand=True, padx=6)
+            sb = ttk.Scrollbar(sf)
+            sb.pack(side="right", fill="y")
+            
+            self.lb = tk.Listbox(sf, bg=G, fg=B, selectbackground=R,
+                                  font=("Georgia", 11), borderwidth=0,
+                                  highlightthickness=0, activestyle="none",
+                                  yscrollcommand=sb.set, cursor="hand2")
+            self.lb.pack(side="left", fill="both", expand=True)
+            sb.config(command=self.lb.yview)
+            self.lb.bind("<<ListboxSelect>>", self._on_sel)
+            
+            bf = tk.Frame(left, bg=G2, pady=4)
+            bf.pack(fill="x", padx=6)
+            self._btn(bf, "＋ Nouveau",  self._nouveau,   V, 10).pack(fill="x", pady=2)
+            self._btn(bf, "✕ Supprimer", self._supprimer, R, 10).pack(fill="x", pady=2)
+            self._btn(bf, "🗨 Commentaires", self._voir_coms, BL, 10).pack(fill="x", pady=2)
+            
+            # ── DROITE — Formulaire + Actions
+            right = tk.Frame(body, bg=N)
+            right.pack(side="left", fill="both", expand=True)
+            
+            frm = tk.LabelFrame(right, text="  DÉTAILS DU CONTENU  ",
+                                 font=("Courier", 10), fg=R, bg=N,
+                                 bd=1, relief="solid", labelanchor="n")
+            frm.pack(fill="both", expand=True, pady=(0, 6))
+            
+            # Type
+            tr = tk.Frame(frm, bg=N)
+            tr.pack(fill="x", padx=12, pady=4)
+            tk.Label(tr, text="Type *", font=("Courier", 9),
+                     fg=T, bg=N, anchor="w").pack(fill="x")
+            
+            self.type_var = tk.StringVar(value="livre")
+            type_row = tk.Frame(tr, bg=N)
+            type_row.pack(fill="x")
+            
+            for lbl, val in TYPES:
+                tk.Radiobutton(type_row, text=lbl, variable=self.type_var,
+                               value=val, bg=N, fg=B, selectcolor=R,
+                               activebackground=N,
+                               font=("Courier", 9)).pack(side="left", padx=4)
+            
+            self.flds = {}
+            self._entry(frm, "titre",       "Titre *")
+            self._entry(frm, "auteur",      "Auteur")
+            self._entry(frm, "genre",       "Genre / Catégorie")
+            self._entry(frm, "prix",        "Prix (FCFA) — 0 si gratuit")
+            self._entry(frm, "lien_drive",  "Lien Google Drive (téléchargement)")
+            self._entry(frm, "lien_media",  "Lien média (audio/vidéo YouTube ou Drive)")
+            self._entry(frm, "description", "Description", multi=True)
+            self._entry(frm, "extrait",     "Extrait lisible (texte)", multi=True)
+            
+            ex = tk.Frame(frm, bg=N)
+            ex.pack(fill="x", padx=12, pady=4)
+            self.grat_var = tk.BooleanVar()
+            tk.Checkbutton(ex, text="✓ Accès gratuit",
+                           variable=self.grat_var,
+                           bg=N, fg=B, selectcolor=R,
+                           activebackground=N,
+                           font=("Courier", 10)).pack(side="left")
+            self._btn(ex, "🖼 Couverture", self._couverture, G2, 9).pack(side="left", padx=8)
+            tk.Label(ex, textvariable=self.cover_var,
+                     font=("Courier", 8), fg=OR, bg=N).pack(side="left")
+            
+            sr = tk.Frame(frm, bg=N, pady=5)
+            sr.pack(fill="x", padx=12)
+            self._btn(sr, "💾  ENREGISTRER", self._enregistrer, V, 11).pack(side="left", padx=(0, 6))
+            self._btn(sr, "✕  ANNULER",      self._vider,       G2, 11).pack(side="left")
+            
+            # ── ACTIONS
+            act = tk.LabelFrame(right, text="  ACTIONS  ",
+                                 font=("Courier", 10), fg=R, bg=N,
+                                 bd=1, relief="solid", labelanchor="n")
+            act.pack(fill="x")
+            ai = tk.Frame(act, bg=N, pady=6)
+            ai.pack(fill="x", padx=10)
+            self._btn(ai, "🌐 PUBLIER",      self._publier,    R,  11).pack(side="left", padx=(0, 6))
+            self._btn(ai, "⟳ SYNCHRONISER", self._synchroniser, BL, 11).pack(side="left", padx=(0, 6))
+            self._btn(ai, "💾 SAUVEGARDER",  self._sauvegarder, OR, 11).pack(side="left", padx=(0, 6))
+            self._btn(ai, "👁 APERÇU",       self._apercu,      G2, 11).pack(side="left", padx=(0, 6))
+            self._btn(ai, "🔗 SITE EN LIGNE", self._ouvrir_site, G2, 11).pack(side="left")
+            
+            self.act_lbl = tk.Label(act, text="", font=("Courier", 9),
+                                    fg=V, bg=N, pady=3)
+            self.act_lbl.pack()
+        
+        # ── LISTE
+        def _charger(self):
+            self.lb.delete(0, tk.END)
+            t = self.type_filtre.get()
+            self.data = get_contenus(None if t == "tous" else t)
+            icons = {"livre": "📚", "app": "💻", "audio": "🎵", "video": "🎬", "autre": "📦"}
+            
+            for b in self.data:
+                ic = icons.get(b["type"], "📦")
+                tag = "🆓" if b["gratuit"] else f"{b['prix']}F"
+                self.lb.insert(tk.END, f"  {ic} {b['titre']}  [{tag}]")
+            
+            s = get_stats()
+            self.stats_lbl.config(
+                text=f"  {s['total']} · {s['ventes']} ventes · {s['revenus']:,}F")
+        
+        def _on_sel(self, _):
+            sel = self.lb.curselection()
+            if not sel:
+                return
+            
+            b = self.data[sel[0]]
+            self.sel_id = b["id"]
+            self._vider()
+            self.type_var.set(b.get("type", "livre"))
+            
+            for k in ["titre", "auteur", "genre", "prix", "lien_drive", "lien_media"]:
+                self.flds[k].insert(0, str(b.get(k, "")))
+            
+            self.flds["description"].insert("1.0", b.get("description", ""))
+            self.flds["extrait"].insert("1.0", b.get("extrait", ""))
+            self.grat_var.set(bool(b.get("gratuit", 0)))
+            self.cover_var.set(b.get("couverture", ""))
+        
+        def _vider(self):
+            self.sel_id = None
+            for k, w in self.flds.items():
+                if isinstance(w, tk.Text):
+                    w.delete("1.0", tk.END)
+                else:
+                    w.delete(0, tk.END)
+            self.grat_var.set(False)
+            self.cover_var.set("")
+            self.type_var.set("livre")
+        
+        def _get_data(self):
+            try:
+                prix = int(self.flds["prix"].get().strip() or "0")
+            except:
+                prix = 0
+            
+            return {
+                "type":        self.type_var.get(),
+                "titre":       self.flds["titre"].get().strip(),
+                "auteur":      self.flds["auteur"].get().strip() or "Japhet Arcade Sophiano ASSOGBA",
+                "genre":       self.flds["genre"].get().strip(),
+                "description": self.flds["description"].get("1.0", tk.END).strip(),
+                "extrait":     self.flds["extrait"].get("1.0", tk.END).strip(),
+                "prix":        prix,
+                "gratuit":     int(self.grat_var.get()),
+                "couverture":  self.cover_var.get(),
+                "lien_drive":  self.flds["lien_drive"].get().strip(),
+                "lien_media":  self.flds["lien_media"].get().strip(),
+            }
+        
+        # ── CRUD
+        def _nouveau(self):
+            self._vider()
+            self.flds["titre"].focus()
+        
+        def _enregistrer(self):
+            d = self._get_data()
+            if not d["titre"]:
+                messagebox.showerror("Erreur", "Le titre est obligatoire.")
+                return
+            
+            if self.sel_id:
+                update_contenu(self.sel_id, d)
+                messagebox.showinfo("✓", f"Modifié : {d['titre']}")
+            else:
+                add_contenu(d)
+                messagebox.showinfo("✓", f"Ajouté : {d['titre']}")
+            
+            self._vider()
+            self._charger()
+        
+        def _supprimer(self):
+            sel = self.lb.curselection()
+            if not sel or not self.sel_id:
+                messagebox.showinfo("Info", "Sélectionne un contenu.")
+                return
+            
+            titre = self.data[sel[0]]["titre"]
+            if messagebox.askyesno("Confirmer", f"Supprimer « {titre} » ?"):
+                delete_contenu(self.sel_id)
+                self._vider()
                 self._charger()
-            else:
-                self.act_lbl.config(text=f"✗ {msg}", fg=R)
-                messagebox.showerror("Erreur", msg)
-        threading.Thread(target=synchroniser,args=(callback,),daemon=True).start()
+        
+        def _couverture(self):
+            path = filedialog.askopenfilename(
+                title="Choisir une image",
+                filetypes=[("Images", "*.jpg *.jpeg *.png *.webp")])
+            
+            if path:
+                nom = Path(path).name
+                dest = COVERS_DIR / nom
+                shutil.copy2(path, dest)
+                self.cover_var.set(f"covers/{nom}")
+        
+        # ── COMMENTAIRES
+        def _voir_coms(self):
+            if not self.sel_id:
+                messagebox.showinfo("Info", "Sélectionne un contenu d'abord.")
+                return
+            
+            win = tk.Toplevel(self.root)
+            win.title("Commentaires")
+            win.geometry("500x420")
+            win.configure(bg=N)
+            
+            coms = get_commentaires(self.sel_id)
+            tk.Label(win, text=f"Commentaires ({len(coms)})",
+                     font=("Georgia", 14, "bold"), fg=R, bg=N, pady=10).pack()
+            
+            sf = tk.Frame(win, bg=N)
+            sf.pack(fill="both", expand=True, padx=10, pady=5)
+            sb = ttk.Scrollbar(sf)
+            sb.pack(side="right", fill="y")
+            
+            lb = tk.Listbox(sf, bg=G, fg=B, font=("Georgia", 11),
+                            borderwidth=0, highlightthickness=0,
+                            yscrollcommand=sb.set)
+            lb.pack(side="left", fill="both", expand=True)
+            sb.config(command=lb.yview)
+            
+            for c in coms:
+                lb.insert(tk.END, f"  {c['nom']} ({c['date_com'][:10]}) : {c['texte'][:60]}")
+            
+            self.coms_data = coms
+            self.coms_lb = lb
+            
+            def supprimer_com():
+                sel = lb.curselection()
+                if not sel:
+                    return
+                com = coms[sel[0]]
+                if messagebox.askyesno("Confirmer", "Supprimer ce commentaire ?"):
+                    delete_commentaire(com["id"])
+                    lb.delete(sel[0])
+            
+            self._btn(win, "✕ Supprimer commentaire", supprimer_com, R, 11).pack(pady=6)
+        
+        # ── ACTIONS
+        def _apercu(self):
+            contenus = get_contenus()
+            html = generer_html(contenus)
+            HTML_PATH.write_text(html, encoding="utf-8")
+            webbrowser.open(str(HTML_PATH))
+        
+        def _ouvrir_site(self):
+            webbrowser.open(CONFIG["SITE_URL"])
+        
+        def _publier(self):
+            self.act_lbl.config(text="⏳ Publication en cours...", fg=OR)
+            self.root.update()
+            
+            def callback(msgs, errors):
+                if errors and not msgs:
+                    self.act_lbl.config(text=f"✗ Échec : {errors[0]}", fg=R)
+                    messagebox.showerror("Erreur", "\n".join(errors[:3]))
+                else:
+                    self.act_lbl.config(
+                        text=f"✓ Publié ! {len(msgs)} fichier(s) mis à jour", fg=V)
+                    messagebox.showinfo("✓ Succès !",
+                        f"Site mis à jour !\n\nVisible dans 1-2 min sur :\n{CONFIG['SITE_URL']}")
+                self._charger()
+            
+            threading.Thread(target=publier_site, args=(callback,), daemon=True).start()
+        
+        def _synchroniser(self):
+            if not messagebox.askyesno("Synchroniser",
+                "Mettre à jour l'app depuis GitHub ?\n"
+                "Les contenus locaux seront mis à niveau."):
+                return
+            
+            self.act_lbl.config(text="⏳ Synchronisation...", fg=OR)
+            self.root.update()
+            
+            def callback(ok, msg):
+                if ok:
+                    self.act_lbl.config(text=msg, fg=V)
+                    messagebox.showinfo("✓ Synchronisé", msg)
+                    self._charger()
+                else:
+                    self.act_lbl.config(text=f"✗ {msg}", fg=R)
+                    messagebox.showerror("Erreur", msg)
+            
+            threading.Thread(target=synchroniser, args=(callback,), daemon=True).start()
+        
+        def _sauvegarder(self):
+            self.act_lbl.config(text="⏳ Sauvegarde en cours...", fg=OR)
+            self.root.update()
+            
+            def do():
+                ok, msg = sauvegarder_drive()
+                if ok:
+                    self.act_lbl.config(text=f"✓ Sauvegardé sur GitHub/backup", fg=V)
+                    messagebox.showinfo("✓ Sauvegardé",
+                        "Fichier gestionnaire.py sauvegardé dans\n"
+                        "sophitekstudio/bibliotheque-sophitek/backup/")
+                else:
+                    self.act_lbl.config(text=f"✗ Erreur sauvegarde", fg=R)
+                    messagebox.showerror("Erreur", msg)
+            
+            threading.Thread(target=do, daemon=True).start()
 
-    def _sauvegarder(self):
-        self.act_lbl.config(text="⏳ Sauvegarde en cours...", fg=OR)
-        self.root.update()
-        def do():
-            ok, msg = sauvegarder_drive()
-            if ok:
-                self.act_lbl.config(text=f"✓ Sauvegardé sur GitHub/backup", fg=V)
-                messagebox.showinfo("✓ Sauvegardé",
-                    "Fichier gestionnaire.py sauvegardé dans\n"
-                    "sophitekstudio/bibliotheque-sophitek/backup/")
-            else:
-                self.act_lbl.config(text=f"✗ Erreur sauvegarde", fg=R)
-                messagebox.showerror("Erreur", msg)
-        threading.Thread(target=do,daemon=True).start()
+def demarrer_flask():
+    """Démarre le serveur Flask"""
+    port = CONFIG["PORT"]
+    flask_app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
-# ════════════════════════════════════════════════════════════════
-# LANCEMENT
-# ════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════
+# POINT D'ENTRÉE
+# ═════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    root = tk.Tk()
-    App(root)
-    root.mainloop()
+    # Initialiser la base de données
+    init_db()
+    
+    if ON_RENDER:
+        # Mode serveur (Render)
+        print(f"Démarrage du serveur Flask sur le port {CONFIG['PORT']}...")
+        port = CONFIG["PORT"]
+        flask_app.run(host="0.0.0.0", port=port)
+    else:
+        # Mode interface graphique (local)
+        print("Démarrage de l'interface graphique...")
+        root = tk.Tk()
+        app = App(root)
+        root.mainloop()
