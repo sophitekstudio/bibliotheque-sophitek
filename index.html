@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Sophitek Studio — Boutique</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cormorant+Garamond:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--n:#0a0a0a;--g:#141414;--g2:#1e1e1e;--g3:#2a2a2a;--r:#c0392b;--r2:#e74c3c;--b:#f5f0e8;--t:#b8b0a8;--v:#27ae60;--or:#b8960c;--bl:#2471a3;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--n);color:var(--b);font-family:'Cormorant Garamond',serif;min-height:100vh;}
+header{text-align:center;padding:70px 20px 40px;position:relative;overflow:hidden;border-bottom:1px solid rgba(192,57,43,.25);}
+header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(192,57,43,.15) 0%,transparent 70%);pointer-events:none;}
+.stag{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:6px;color:var(--r);text-transform:uppercase;margin-bottom:16px;}
+h1{font-family:'Playfair Display',serif;font-size:clamp(44px,9vw,96px);font-weight:900;line-height:.88;letter-spacing:-2px;}
+h1 em{color:var(--r);font-style:normal;}
+.hsub{font-size:15px;font-weight:300;color:var(--t);letter-spacing:3px;margin-top:18px;}
+.stats{display:flex;justify-content:center;background:var(--g);border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap;}
+.stat{text-align:center;padding:18px 32px;border-right:1px solid rgba(255,255,255,.06);}
+.stat:last-child{border-right:none;}
+.sn{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--r);display:block;}
+.sl{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--t);text-transform:uppercase;margin-top:4px;display:block;}
+.filters{display:flex;justify-content:center;gap:8px;padding:28px 16px;flex-wrap:wrap;}
+.f{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:8px 18px;border:1px solid rgba(192,57,43,.3);background:transparent;color:var(--t);cursor:pointer;transition:all .25s;}
+.f:hover,.f.active{background:var(--r);color:#fff;border-color:var(--r);}
+main{max-width:1380px;margin:0 auto;padding:0 24px 100px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:28px;}
+.card{background:var(--g);border:1px solid rgba(255,255,255,.06);transition:all .3s;}
+.card:hover{border-color:rgba(192,57,43,.35);transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.4);}
+.cw{position:relative;aspect-ratio:2/3;overflow:hidden;background:var(--g3);display:flex;align-items:center;justify-content:center;}
+.cw-icon{font-size:60px;opacity:.3;}
+.badge{position:absolute;top:12px;right:12px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:4px 10px;color:#fff;}
+.badge.free{background:var(--v);}
+.badge.paid{background:var(--r);}
+.ti{position:absolute;top:12px;left:12px;font-size:16px;background:rgba(0,0,0,.65);padding:4px 7px;}
+.cb{padding:16px;}
+.gt{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--r);text-transform:uppercase;}
+h3{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--b);line-height:1.2;margin:6px 0 4px;}
+.au{font-size:12px;color:var(--t);margin-bottom:8px;font-style:italic;}
+.de{font-size:13px;color:var(--t);line-height:1.6;margin-bottom:12px;}
+.btns{display:flex;flex-direction:column;gap:6px;}
+.btn{display:block;width:100%;padding:10px 14px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;text-align:center;text-decoration:none;border:none;cursor:pointer;transition:all .2s;font-weight:700;}
+.buy-btn{background:var(--r);color:#fff;}
+.free-btn{background:var(--v);color:#fff;}
+.disc-btn{background:transparent;color:var(--t);border:1px solid rgba(255,255,255,.15);}
+.disc-btn:hover{background:#25D366;color:#fff;}
+.ext-btn{background:var(--g3);color:var(--b);border:1px solid rgba(255,255,255,.12);}
+footer{text-align:center;padding:40px;border-top:1px solid rgba(255,255,255,.06);}
+footer p{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;color:rgba(255,255,255,.25);text-transform:uppercase;}
+footer em{color:var(--r);font-style:normal;}
+@media(max-width:640px){h1{font-size:clamp(36px,11vw,60px);}.grid{grid-template-columns:repeat(2,1fr);gap:14px;}.stat{padding:14px 20px;}.sn{font-size:22px;}main{padding:0 12px 80px;}}
+</style>
+</head>
+<body>
+<header>
+  <div class="stag">Sophitek Studio — Boutique Officielle</div>
+  <h1>SOPHITEK<br/><em>STUDIO</em></h1>
+  <p class="hsub">Japhet Arcade Sophiano ASSOGBA</p>
+</header>
+<div class="stats">
+  <div class="stat"><span class="sn">8</span><span class="sl">Contenus</span></div>
+  <div class="stat"><span class="sn">2</span><span class="sl">Gratuits</span></div>
+  <div class="stat"><span class="sn">0</span><span class="sl">Ventes</span></div>
+  <div class="stat"><span class="sn">0</span><span class="sl">FCFA</span></div>
+  <div class="stat"><span class="sn">0</span><span class="sl">Avis</span></div>
+</div>
+<div class="filters">
+  <button class="f active" data-f="tous">Tous</button>
+  <button class="f" data-f="livre">📚 Livres</button>
+  <button class="f" data-f="app">💻 Apps</button>
+  <button class="f" data-f="audio">🎵 Audios</button>
+  <button class="f" data-f="video">🎬 Vidéos</button>
+  <button class="f" data-f="autre">📦 Autres</button>
+</div>
+<main><div class="grid" id="grid">
+
+  <div class="card" data-type="livre">
+    <div class="cw"><div class="cw-icon">📚</div>
+      <span class="badge paid">1 000 FCFA</span>
+      <span class="ti">📚</span>
+    </div>
+    <div class="cb">
+      <span class="gt">Sagesse</span>
+      <h3>Les Mots du Sage</h3>
+      <p class="au">Japhet Arcade Sophiano ASSOGBA</p>
+      <p class="de">5 volumes, 43 parties, plus de 750 conseils pour mieux vivre, parler, aimer et agir.</p>
+      <div class="btns">
+        <button class="btn ext-btn">📖 Lire un extrait</button>
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
+        <button class="btn buy-btn">🛒 Acheter — 1 000 FCFA</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-type="livre">
+    <div class="cw"><div class="cw-icon">📚</div>
+      <span class="badge free">GRATUIT</span>
+      <span class="ti">📚</span>
+    </div>
+    <div class="cb">
+      <span class="gt">Sagesse</span>
+      <h3>Les Mots du Sage — Vol. I</h3>
+      <p class="au">Japhet Arcade Sophiano ASSOGBA</p>
+      <p class="de">Le premier volume offert gratuitement. Parler, timidité, conflits, confiance, pardon et plus.</p>
+      <div class="btns">
+        <button class="btn ext-btn">📖 Lire un extrait</button>
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
+        <a href="#" class="btn free-btn">↓ Télécharger gratuitement</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-type="app">
+    <div class="cw"><div class="cw-icon">💻</div>
+      <span class="badge paid">2 000 FCFA</span>
+      <span class="ti">💻</span>
+    </div>
+    <div class="cb">
+      <span class="gt">Application PC</span>
+      <h3>VisionGraphPro V3</h3>
+      <p class="au">Sophitek Studio</p>
+      <p class="de">Visualiseur de fonctions mathématiques avec analyse sympy, asymptotes, intégrales et tableaux de variation.</p>
+      <div class="btns">
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn buy-btn">🛒 Commander</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-type="app">
+    <div class="cw"><div class="cw-icon">💻</div>
+      <span class="badge free">GRATUIT</span>
+      <span class="ti">💻</span>
+    </div>
+    <div class="cb">
+      <span class="gt">Application PC</span>
+      <h3>Formules BTP v3</h3>
+      <p class="au">Sophitek Studio</p>
+      <p class="de">43 formules BTP réparties en 10 catégories. Outil indispensable pour les professionnels du bâtiment.</p>
+      <div class="btns">
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
+        <a href="#" class="btn free-btn">↓ Télécharger</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-type="video">
+    <div class="cw"><div class="cw-icon">🎬</div>
+      <span class="badge paid">500 FCFA</span>
+      <span class="ti">🎬</span>
+    </div>
+    <div class="cb">
+      <span class="gt">Tutoriel</span>
+      <h3>Apprendre Python en 30 jours</h3>
+      <p class="au">Sophitek Studio</p>
+      <p class="de">Série complète de tutoriels vidéo pour apprendre Python de zéro jusqu'aux applications avancées.</p>
+      <div class="btns">
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn buy-btn">🛒 Commander</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-type="audio">
+    <div class="cw"><div class="cw-icon">🎵</div>
+      <span class="badge free">GRATUIT</span>
+      <span class="ti">🎵</span>
+    </div>
+    <div class="cb">
+      <span class="gt">Podcast</span>
+      <h3>La Voix du Sage — Épisode 1</h3>
+      <p class="au">Japhet Arcade Sophiano ASSOGBA</p>
+      <p class="de">Premier épisode du podcast Les Mots du Sage. Conseils sur la parole et la sagesse au quotidien.</p>
+      <div class="btns">
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
+        <a href="#" class="btn free-btn">▶ Écouter</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-type="livre">
+    <div class="cw"><div class="cw-icon">📚</div>
+      <span class="badge paid">1 500 FCFA</span>
+      <span class="ti">📚</span>
+    </div>
+    <div class="cb">
+      <span class="gt">Roman</span>
+      <h3>Le Poids d'un Chèque</h3>
+      <p class="au">Japhet Arcade Sophiano ASSOGBA</p>
+      <p class="de">Un thriller surnaturel ancré dans la culture béninoise et fon. Une histoire entre le visible et l'invisible.</p>
+      <div class="btns">
+        <button class="btn ext-btn">📖 Lire un extrait</button>
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
+        <button class="btn buy-btn">🛒 Acheter — 1 500 FCFA</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-type="autre">
+    <div class="cw"><div class="cw-icon">📦</div>
+      <span class="badge paid">3 000 FCFA</span>
+      <span class="ti">📦</span>
+    </div>
+    <div class="cb">
+      <span class="gt">Pack complet</span>
+      <h3>Pack Sophitek Studio Complet</h3>
+      <p class="au">Sophitek Studio</p>
+      <p class="de">Tous les livres + toutes les applications Sophitek Studio en un seul pack à prix réduit.</p>
+      <div class="btns">
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
+        <a href="https://wa.me/2290143678355" target="_blank" class="btn buy-btn">🛒 Commander</a>
+      </div>
+    </div>
+  </div>
+
+</div></main>
+<footer><p>© 2026 <em>Sophitek Studio</em> — Tous droits réservés</p></footer>
+<script>
+document.querySelectorAll('.f').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.f').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  const f=b.dataset.f;
+  document.querySelectorAll('.card').forEach(c=>c.classList.toggle('hidden',f!=='tous'&&c.dataset.type!==f));
+}));
+</script>
+</body></html>
