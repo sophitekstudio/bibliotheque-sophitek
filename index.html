@@ -4,223 +4,250 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Sophitek Studio — Boutique</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cormorant+Garamond:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Cormorant+Garamond:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
 <style>
 :root{--n:#0a0a0a;--g:#141414;--g2:#1e1e1e;--g3:#2a2a2a;--r:#c0392b;--r2:#e74c3c;--b:#f5f0e8;--t:#b8b0a8;--v:#27ae60;--or:#b8960c;--bl:#2471a3;}
 *{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
 body{background:var(--n);color:var(--b);font-family:'Cormorant Garamond',serif;min-height:100vh;}
+/* ── HEADER */
 header{text-align:center;padding:70px 20px 40px;position:relative;overflow:hidden;border-bottom:1px solid rgba(192,57,43,.25);}
 header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(192,57,43,.15) 0%,transparent 70%);pointer-events:none;}
-.stag{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:6px;color:var(--r);text-transform:uppercase;margin-bottom:16px;}
-h1{font-family:'Playfair Display',serif;font-size:clamp(44px,9vw,96px);font-weight:900;line-height:.88;letter-spacing:-2px;}
+.stag{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:6px;color:var(--r);text-transform:uppercase;margin-bottom:16px;opacity:.9;}
+h1{font-family:'Playfair Display',serif;font-size:clamp(44px,9vw,96px);font-weight:900;line-height:.88;letter-spacing:-2px;color:var(--b);}
 h1 em{color:var(--r);font-style:normal;}
 .hsub{font-size:15px;font-weight:300;color:var(--t);letter-spacing:3px;margin-top:18px;}
-.stats{display:flex;justify-content:center;background:var(--g);border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap;}
+/* ── STATS */
+.stats{display:flex;justify-content:center;gap:0;background:var(--g);border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap;}
 .stat{text-align:center;padding:18px 32px;border-right:1px solid rgba(255,255,255,.06);}
 .stat:last-child{border-right:none;}
-.sn{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--r);display:block;}
+.sn{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--r);display:block;line-height:1;}
 .sl{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--t);text-transform:uppercase;margin-top:4px;display:block;}
+/* ── FILTRES */
 .filters{display:flex;justify-content:center;gap:8px;padding:28px 16px;flex-wrap:wrap;}
-.f{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:8px 18px;border:1px solid rgba(192,57,43,.3);background:transparent;color:var(--t);cursor:pointer;transition:all .25s;}
+.f{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:8px 18px;border:1px solid rgba(192,57,43,.3);background:transparent;color:var(--t);cursor:pointer;transition:all .25s;border-radius:0;}
 .f:hover,.f.active{background:var(--r);color:#fff;border-color:var(--r);}
+/* ── GRILLE */
 main{max-width:1380px;margin:0 auto;padding:0 24px 100px;}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:28px;}
-.card{background:var(--g);border:1px solid rgba(255,255,255,.06);transition:all .3s;}
+.card{background:var(--g);border:1px solid rgba(255,255,255,.06);transition:all .3s;position:relative;}
 .card:hover{border-color:rgba(192,57,43,.35);transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.4);}
-.cw{position:relative;aspect-ratio:2/3;overflow:hidden;background:var(--g3);display:flex;align-items:center;justify-content:center;}
-.cw-icon{font-size:60px;opacity:.3;}
-.badge{position:absolute;top:12px;right:12px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:4px 10px;color:#fff;}
+.card.hidden{display:none;}
+/* Cover */
+.cw{position:relative;aspect-ratio:2/3;overflow:hidden;background:var(--g3);}
+.cw img{width:100%;height:100%;object-fit:cover;transition:.6s;}
+.card:hover .cw img{transform:scale(1.05);}
+.badge{position:absolute;top:12px;right:12px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:4px 10px;color:#fff;letter-spacing:1px;}
 .badge.free{background:var(--v);}
 .badge.paid{background:var(--r);}
-.ti{position:absolute;top:12px;left:12px;font-size:16px;background:rgba(0,0,0,.65);padding:4px 7px;}
+.ti{position:absolute;top:12px;left:12px;font-size:16px;background:rgba(0,0,0,.65);padding:4px 7px;backdrop-filter:blur(4px);}
+/* Body */
 .cb{padding:16px;}
 .gt{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--r);text-transform:uppercase;}
 h3{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--b);line-height:1.2;margin:6px 0 4px;}
 .au{font-size:12px;color:var(--t);margin-bottom:8px;font-style:italic;}
 .de{font-size:13px;color:var(--t);line-height:1.6;margin-bottom:12px;}
-.btns{display:flex;flex-direction:column;gap:6px;}
+/* Boutons */
+.btns{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
 .btn{display:block;width:100%;padding:10px 14px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;text-align:center;text-decoration:none;border:none;cursor:pointer;transition:all .2s;font-weight:700;}
 .buy-btn{background:var(--r);color:#fff;}
+.buy-btn:hover{background:var(--r2);}
 .free-btn{background:var(--v);color:#fff;}
+.free-btn:hover{background:#2ecc71;}
 .disc-btn{background:transparent;color:var(--t);border:1px solid rgba(255,255,255,.15);}
-.disc-btn:hover{background:#25D366;color:#fff;}
+.disc-btn:hover{background:#25D366;color:#fff;border-color:#25D366;}
 .ext-btn{background:var(--g3);color:var(--b);border:1px solid rgba(255,255,255,.12);}
+.ext-btn:hover{background:var(--or);border-color:var(--or);}
+/* Commentaires */
+.cs{border-top:1px solid rgba(255,255,255,.07);padding-top:10px;}
+.ct2{font-family:'Space Mono',monospace;font-size:9px;color:var(--t);cursor:pointer;padding:4px 0;letter-spacing:2px;}
+.ct2:hover{color:var(--b);}
+.cb2{margin-top:8px;}
+.ci{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+.cn{font-family:'Space Mono',monospace;font-size:10px;color:var(--r);font-weight:700;}
+.cd{font-family:'Space Mono',monospace;font-size:9px;color:rgba(255,255,255,.3);margin-left:8px;}
+.ct{font-size:12px;color:var(--t);margin-top:4px;line-height:1.5;}
+.cf{margin-top:10px;display:flex;flex-direction:column;gap:6px;}
+.ci2{background:var(--g3);border:1px solid rgba(255,255,255,.1);color:var(--b);font-family:'Cormorant Garamond',serif;font-size:13px;padding:8px 10px;outline:none;resize:none;width:100%;}
+.ci2:focus{border-color:var(--r);}
+.bc{background:var(--bl);color:#fff;border:none;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;padding:8px;cursor:pointer;transition:.2s;width:100%;}
+.bc:hover{background:#2980b9;}
+/* Empty */
+.empty{text-align:center;padding:100px 20px;color:rgba(255,255,255,.25);font-family:'Space Mono',monospace;font-size:12px;letter-spacing:3px;line-height:2;grid-column:1/-1;}
+/* ── MODALS */
+.mov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:1000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);}
+.mov.open{display:flex;}
+/* Modal extrait */
+.mext{background:var(--g);border:1px solid rgba(192,57,43,.35);max-width:680px;width:100%;max-height:88vh;overflow-y:auto;padding:36px;position:relative;}
+.mext h2{font-family:'Playfair Display',serif;font-size:24px;color:var(--b);margin-bottom:20px;padding-right:32px;border-bottom:1px solid rgba(192,57,43,.2);padding-bottom:14px;}
+.mtxt{font-size:16px;color:var(--t);line-height:2;white-space:pre-wrap;}
+/* Modal paiement */
+.mpay{background:var(--g);border:1px solid rgba(192,57,43,.35);max-width:440px;width:100%;padding:36px;position:relative;}
+.mclose{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--t);font-size:24px;cursor:pointer;line-height:1;}
+.mclose:hover{color:var(--b);}
+.ptit{font-family:'Playfair Display',serif;font-size:22px;color:var(--b);margin-bottom:6px;}
+.pprix{font-family:'Playfair Display',serif;font-size:32px;font-weight:900;color:var(--r);margin-bottom:20px;}
+.plbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--t);text-transform:uppercase;display:block;margin-bottom:6px;}
+.pinp{width:100%;background:var(--g3);border:1px solid rgba(255,255,255,.1);color:var(--b);font-size:20px;padding:12px 14px;outline:none;margin-bottom:16px;font-family:'Cormorant Garamond',serif;}
+.pinp:focus{border-color:var(--r);}
+.pbtn{width:100%;background:var(--r);color:#fff;border:none;font-family:'Space Mono',monospace;font-size:12px;letter-spacing:3px;text-transform:uppercase;padding:15px;cursor:pointer;transition:.2s;font-weight:700;}
+.pbtn:hover{background:var(--r2);}
+.pstat{text-align:center;padding:8px 0;font-size:13px;color:var(--t);line-height:1.7;}
+.spin{width:44px;height:44px;border:3px solid rgba(192,57,43,.25);border-top-color:var(--r);border-radius:50%;animation:sp 1s linear infinite;margin:12px auto;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.pok{font-size:52px;margin:8px 0;}
+.psucc{font-family:'Playfair Display',serif;font-size:22px;color:var(--v);margin-bottom:12px;}
+.pdl{display:block;width:100%;background:var(--v);color:#fff;text-decoration:none;text-align:center;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;padding:15px;transition:.2s;font-weight:700;}
+.pdl:hover{background:#2ecc71;}
+.pwarn{font-family:'Space Mono',monospace;font-size:9px;color:rgba(255,255,255,.3);text-align:center;margin-top:8px;letter-spacing:2px;}
+.perr{font-size:40px;margin:8px 0;}
+.perrt{color:var(--r2);margin-bottom:16px;font-family:'Playfair Display',serif;font-size:18px;}
+.pret{background:transparent;border:1px solid var(--r);color:var(--r);font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;padding:10px 24px;cursor:pointer;transition:.2s;}
+.pret:hover{background:var(--r);color:#fff;}
+/* ── FOOTER */
 footer{text-align:center;padding:40px;border-top:1px solid rgba(255,255,255,.06);}
 footer p{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;color:rgba(255,255,255,.25);text-transform:uppercase;}
 footer em{color:var(--r);font-style:normal;}
-@media(max-width:640px){h1{font-size:clamp(36px,11vw,60px);}.grid{grid-template-columns:repeat(2,1fr);gap:14px;}.stat{padding:14px 20px;}.sn{font-size:22px;}main{padding:0 12px 80px;}}
+/* ── RESPONSIVE */
+@media(max-width:640px){
+  h1{font-size:clamp(36px,11vw,60px);}
+  .grid{grid-template-columns:repeat(2,1fr);gap:14px;}
+  .stat{padding:14px 20px;}
+  .sn{font-size:22px;}
+  main{padding:0 12px 80px;}
+}
 </style>
 </head>
 <body>
+
 <header>
   <div class="stag">Sophitek Studio — Boutique Officielle</div>
   <h1>SOPHITEK<br/><em>STUDIO</em></h1>
   <p class="hsub">Japhet Arcade Sophiano ASSOGBA</p>
 </header>
+
 <div class="stats">
-  <div class="stat"><span class="sn">8</span><span class="sl">Contenus</span></div>
-  <div class="stat"><span class="sn">2</span><span class="sl">Gratuits</span></div>
+  <div class="stat"><span class="sn">1</span><span class="sl">Contenus</span></div>
+  <div class="stat"><span class="sn">1</span><span class="sl">Gratuits</span></div>
   <div class="stat"><span class="sn">0</span><span class="sl">Ventes</span></div>
   <div class="stat"><span class="sn">0</span><span class="sl">FCFA</span></div>
   <div class="stat"><span class="sn">0</span><span class="sl">Avis</span></div>
 </div>
-<div class="filters">
-  <button class="f active" data-f="tous">Tous</button>
-  <button class="f" data-f="livre">📚 Livres</button>
-  <button class="f" data-f="app">💻 Apps</button>
-  <button class="f" data-f="audio">🎵 Audios</button>
-  <button class="f" data-f="video">🎬 Vidéos</button>
-  <button class="f" data-f="autre">📦 Autres</button>
-</div>
-<main><div class="grid" id="grid">
 
-  <div class="card" data-type="livre">
-    <div class="cw"><div class="cw-icon">📚</div>
-      <span class="badge paid">1 000 FCFA</span>
-      <span class="ti">📚</span>
-    </div>
-    <div class="cb">
-      <span class="gt">Sagesse</span>
-      <h3>Les Mots du Sage</h3>
-      <p class="au">Japhet Arcade Sophiano ASSOGBA</p>
-      <p class="de">5 volumes, 43 parties, plus de 750 conseils pour mieux vivre, parler, aimer et agir.</p>
-      <div class="btns">
-        <button class="btn ext-btn">📖 Lire un extrait</button>
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
-        <button class="btn buy-btn">🛒 Acheter — 1 000 FCFA</button>
-      </div>
-    </div>
-  </div>
+<div class="filters"><button class="f active" data-f="tous">Tous</button><button class="f" data-f="📦 Autre">📦 Autre</button></div>
+<main><div class="grid" id="grid"><div class="card" data-type="📦 Autre">
+<div class="cw"><img src="covers/image_aec67c31-00a9-4dcc-b301-fd53b2633155.jpeg" alt="sophitek studio" loading="lazy"/><span class="badge free">GRATUIT</span><span class="ti">📦</span></div>
+<div class="cb">
+<span class="gt">WEB</span><h3>sophitek studio</h3>
+<p class="au">JAPHET</p><p class="de"></p>
+<div class="btns"><a href="https://wa.me/2290143678355?text=Bonjour%2C%20je%20voudrais%20en%20savoir%20plus%20sur%20%3A%20sophitek%20studio" target="_blank" class="btn disc-btn">💬 Discuter</a></div>
+<div class="cs"><div class="ct2" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display=='none'?'block':'none'">💬 0 commentaires</div>
+<div class="cb2" style="display:none">
+<div class="cf"><input class="ci2" placeholder="Votre nom" id="n1"/><textarea class="ci2" placeholder="Votre commentaire..." id="t1" rows="2"></textarea>
+<button class="bc" onclick="envoyerCom(1)">Envoyer</button></div></div></div>
+</div></div></div></main>
 
-  <div class="card" data-type="livre">
-    <div class="cw"><div class="cw-icon">📚</div>
-      <span class="badge free">GRATUIT</span>
-      <span class="ti">📚</span>
-    </div>
-    <div class="cb">
-      <span class="gt">Sagesse</span>
-      <h3>Les Mots du Sage — Vol. I</h3>
-      <p class="au">Japhet Arcade Sophiano ASSOGBA</p>
-      <p class="de">Le premier volume offert gratuitement. Parler, timidité, conflits, confiance, pardon et plus.</p>
-      <div class="btns">
-        <button class="btn ext-btn">📖 Lire un extrait</button>
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
-        <a href="#" class="btn free-btn">↓ Télécharger gratuitement</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" data-type="app">
-    <div class="cw"><div class="cw-icon">💻</div>
-      <span class="badge paid">2 000 FCFA</span>
-      <span class="ti">💻</span>
-    </div>
-    <div class="cb">
-      <span class="gt">Application PC</span>
-      <h3>VisionGraphPro V3</h3>
-      <p class="au">Sophitek Studio</p>
-      <p class="de">Visualiseur de fonctions mathématiques avec analyse sympy, asymptotes, intégrales et tableaux de variation.</p>
-      <div class="btns">
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn buy-btn">🛒 Commander</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" data-type="app">
-    <div class="cw"><div class="cw-icon">💻</div>
-      <span class="badge free">GRATUIT</span>
-      <span class="ti">💻</span>
-    </div>
-    <div class="cb">
-      <span class="gt">Application PC</span>
-      <h3>Formules BTP v3</h3>
-      <p class="au">Sophitek Studio</p>
-      <p class="de">43 formules BTP réparties en 10 catégories. Outil indispensable pour les professionnels du bâtiment.</p>
-      <div class="btns">
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
-        <a href="#" class="btn free-btn">↓ Télécharger</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" data-type="video">
-    <div class="cw"><div class="cw-icon">🎬</div>
-      <span class="badge paid">500 FCFA</span>
-      <span class="ti">🎬</span>
-    </div>
-    <div class="cb">
-      <span class="gt">Tutoriel</span>
-      <h3>Apprendre Python en 30 jours</h3>
-      <p class="au">Sophitek Studio</p>
-      <p class="de">Série complète de tutoriels vidéo pour apprendre Python de zéro jusqu'aux applications avancées.</p>
-      <div class="btns">
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn buy-btn">🛒 Commander</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" data-type="audio">
-    <div class="cw"><div class="cw-icon">🎵</div>
-      <span class="badge free">GRATUIT</span>
-      <span class="ti">🎵</span>
-    </div>
-    <div class="cb">
-      <span class="gt">Podcast</span>
-      <h3>La Voix du Sage — Épisode 1</h3>
-      <p class="au">Japhet Arcade Sophiano ASSOGBA</p>
-      <p class="de">Premier épisode du podcast Les Mots du Sage. Conseils sur la parole et la sagesse au quotidien.</p>
-      <div class="btns">
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
-        <a href="#" class="btn free-btn">▶ Écouter</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" data-type="livre">
-    <div class="cw"><div class="cw-icon">📚</div>
-      <span class="badge paid">1 500 FCFA</span>
-      <span class="ti">📚</span>
-    </div>
-    <div class="cb">
-      <span class="gt">Roman</span>
-      <h3>Le Poids d'un Chèque</h3>
-      <p class="au">Japhet Arcade Sophiano ASSOGBA</p>
-      <p class="de">Un thriller surnaturel ancré dans la culture béninoise et fon. Une histoire entre le visible et l'invisible.</p>
-      <div class="btns">
-        <button class="btn ext-btn">📖 Lire un extrait</button>
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
-        <button class="btn buy-btn">🛒 Acheter — 1 500 FCFA</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" data-type="autre">
-    <div class="cw"><div class="cw-icon">📦</div>
-      <span class="badge paid">3 000 FCFA</span>
-      <span class="ti">📦</span>
-    </div>
-    <div class="cb">
-      <span class="gt">Pack complet</span>
-      <h3>Pack Sophitek Studio Complet</h3>
-      <p class="au">Sophitek Studio</p>
-      <p class="de">Tous les livres + toutes les applications Sophitek Studio en un seul pack à prix réduit.</p>
-      <div class="btns">
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn disc-btn">💬 Discuter</a>
-        <a href="https://wa.me/2290143678355" target="_blank" class="btn buy-btn">🛒 Commander</a>
-      </div>
-    </div>
-  </div>
-
-</div></main>
 <footer><p>© 2026 <em>Sophitek Studio</em> — Tous droits réservés</p></footer>
+
+<!-- Modal Extrait -->
+<div class="mov" id="mext-ov">
+  <div class="mext">
+    <button class="mclose" onclick="ferm('mext-ov')">✕</button>
+    <h2 id="ext-tit"></h2>
+    <div class="mtxt" id="ext-txt"></div>
+  </div>
+</div>
+
+<!-- Modal Paiement -->
+<div class="mov" id="mpay-ov">
+  <div class="mpay">
+    <button class="mclose" onclick="ferm('mpay-ov')">✕</button>
+    <div class="ptit" id="p-tit"></div>
+    <div class="pprix" id="p-prix"></div>
+    <div id="ps1">
+      <span class="plbl">Votre numéro MTN / Moov Money</span>
+      <input class="pinp" id="p-tel" placeholder="ex : 67 00 00 00" maxlength="12"/>
+      <button class="pbtn" onclick="payerNow()">💳 &nbsp;Payer maintenant</button>
+    </div>
+    <div id="ps2" style="display:none;text-align:center">
+      <div class="spin"></div>
+      <p class="pstat">Un message de validation a été envoyé<br/>sur votre téléphone.<br/>Validez et patientez...</p>
+    </div>
+    <div id="ps3" style="display:none;text-align:center">
+      <div class="pok">✅</div>
+      <div class="psucc">Paiement confirmé !</div>
+      <a class="pdl" id="p-dl" href="#" target="_blank">↓ &nbsp;Télécharger mon livre</a>
+      <p class="pwarn">⚠ Lien valide pour 1 seul téléchargement</p>
+    </div>
+    <div id="ps4" style="display:none;text-align:center">
+      <div class="perr">❌</div>
+      <div class="perrt">Paiement non abouti</div>
+      <p class="pstat">Vérifiez votre solde et réessayez.</p>
+      <button class="pret" onclick="rstPay()">↺ Réessayer</button>
+    </div>
+  </div>
+</div>
+
 <script>
+const API='https://bibliotheque-sophitek.onrender.com';
+let payId=null,cmdId=null,pollT=null;
+
+// Filtres
 document.querySelectorAll('.f').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.f').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');
   const f=b.dataset.f;
   document.querySelectorAll('.card').forEach(c=>c.classList.toggle('hidden',f!=='tous'&&c.dataset.type!==f));
 }));
+
+// Extrait
+function voirExtrait(txt,tit){document.getElementById('ext-tit').textContent=tit;document.getElementById('ext-txt').textContent=txt;document.getElementById('mext-ov').classList.add('open');}
+
+// Commentaires
+async function envoyerCom(id){
+  const nom=document.getElementById('n'+id).value.trim();
+  const txt=document.getElementById('t'+id).value.trim();
+  if(!nom||!txt){alert('Remplissez votre nom et commentaire.');return;}
+  try{
+    await fetch(API+'/commentaire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contenu_id:id,nom,texte:txt})});
+    document.getElementById('n'+id).value='';document.getElementById('t'+id).value='';
+    alert('Merci ! Votre commentaire a bien été envoyé.');
+  }catch(e){alert('Erreur réseau. Réessayez.');}
+}
+
+// Paiement
+function acheter(id,prix,titre){
+  payId=id;
+  document.getElementById('p-tit').textContent=titre;
+  document.getElementById('p-prix').textContent=prix+' FCFA';
+  rstPay();
+  document.getElementById('mpay-ov').classList.add('open');
+}
+
+async function payerNow(){
+  const tel=document.getElementById('p-tel').value.trim();
+  if(!tel||tel.length<8){alert('Entrez un numéro valide.');return;}
+  showPs(2);
+  try{
+    const r=await fetch(API+'/acheter/'+payId,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telephone:tel})});
+    const d=await r.json();
+    if(!d.success)throw new Error(d.erreur||'Erreur');
+    cmdId=d.commande_id;
+    let n=0;
+    pollT=setInterval(async()=>{
+      if(++n>72){clearInterval(pollT);showPs(4);return;}
+      const rv=await fetch(API+'/verifier/'+cmdId);
+      const dv=await rv.json();
+      if(dv.statut==='paye'){clearInterval(pollT);document.getElementById('p-dl').href=dv.lien;showPs(3);}
+      else if(dv.statut==='echec'){clearInterval(pollT);showPs(4);}
+    },5000);
+  }catch(e){showPs(4);}
+}
+
+function showPs(n){[1,2,3,4].forEach(i=>document.getElementById('ps'+i).style.display=i===n?'block':'none');}
+function rstPay(){if(pollT)clearInterval(pollT);cmdId=null;document.getElementById('p-tel').value='';showPs(1);}
+function ferm(id){document.getElementById(id).classList.remove('open');if(id==='mpay-ov')rstPay();}
+document.querySelectorAll('.mov').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m)ferm(m.id); }));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')document.querySelectorAll('.mov.open').forEach(m=>ferm(m.id)); });
 </script>
 </body></html>
