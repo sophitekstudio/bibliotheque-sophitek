@@ -1,12 +1,8 @@
 """
 ╔══════════════════════════════════════════════════════════════╗
-║         SOPHITEK STUDIO — GESTIONNAIRE FINAL                 ║
-║         Auteur : Japhet Arcade Sophiano ASSOGBA               ║
-║         Un seul fichier. Fonctionne sur PC et sur Render.    ║
+║       SOPHITEK STUDIO — GESTIONNAIRE v3 (PyQt6)             ║
+║       Auteur : Japhet Arcade Sophiano ASSOGBA                ║
 ╚══════════════════════════════════════════════════════════════╝
-
-Sur ton PC    → Lance Tkinter (manager) + Flask (API) en arrière-plan
-Sur Render    → Lance Flask uniquement (serveur de paiements)
 """
 
 import os, sys, sqlite3, hashlib, json, shutil, threading
@@ -17,574 +13,225 @@ from pathlib import Path
 import requests as req
 from flask import Flask, request, jsonify, redirect, abort
 
-# ── Détection environnement ──────────────────────────────────
-ON_RENDER = os.environ.get("RENDER", "").lower() == "true"
+# ── Détection environnement
+ON_RENDER = os.environ.get("RENDER","").lower() == "true"
 
-# ── Chargement .env (PC uniquement) ─────────────────────────
+# ── Chargement .env
 def _load_env():
-    env_path = Path(__file__).parent / ".env"
-    if env_path.exists():
-        with open(env_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, _, val = line.partition("=")
-                    os.environ.setdefault(key.strip(), val.strip())
+    env = Path(__file__).parent / ".env"
+    if env.exists():
+        for line in env.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k,_,v = line.partition("=")
+                os.environ.setdefault(k.strip(), v.strip())
 _load_env()
 
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
 # CONFIGURATION
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
 CONFIG = {
-    "GITHUB_TOKEN":  os.environ.get("GITHUB_TOKEN", ""),
-    "GITHUB_REPO":   "sophitekstudio/bibliotheque-sophitek",
-    "RENDER_URL":    "https://bibliotheque-sophitek.onrender.com",
-    "FEDAPAY_KEY":   os.environ.get("FEDAPAY_KEY", ""),
-    "WHATSAPP":      "2290143678355",
-    "PRIX_DEFAUT":   1000,
-    "ADMIN_KEY":     os.environ.get("ADMIN_KEY", "sophitek2026"),
-    "PORT":          int(os.environ.get("PORT", 5000)),
-    "SITE_URL":      "https://sophitekstudio.github.io/bibliotheque-sophitek/",
+    "GITHUB_TOKEN": os.environ.get("GITHUB_TOKEN",""),
+    "GITHUB_REPO":  "sophitekstudio/bibliotheque-sophitek",
+    "RENDER_URL":   "https://bibliotheque-sophitek.onrender.com",
+    "FEDAPAY_KEY":  os.environ.get("FEDAPAY_KEY",""),
+    "WHATSAPP":     "2290143678355",
+    "PRIX_DEFAUT":  1000,
+    "ADMIN_KEY":    os.environ.get("ADMIN_KEY","sophitek2026"),
+    "PORT":         int(os.environ.get("PORT",5000)),
+    "SITE_URL":     "https://sophitekstudio.github.io/bibliotheque-sophitek/",
 }
 
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
 # CHEMINS
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
 BASE_DIR   = Path(__file__).parent
 SITE_DIR   = BASE_DIR / "site"
 COVERS_DIR = SITE_DIR / "covers"
 DB_PATH    = BASE_DIR / "data" / "sophitek.db"
 JSON_PATH  = SITE_DIR / "data.json"
 HTML_PATH  = SITE_DIR / "index.html"
+LOGO_PATH  = SITE_DIR / "logo.png"
 
 COVERS_DIR.mkdir(parents=True, exist_ok=True)
 (BASE_DIR / "data").mkdir(parents=True, exist_ok=True)
 
-logging.basicConfig(
-    level=logging.INFO,
+logging.basicConfig(level=logging.INFO,
     format="%(asctime)s — %(levelname)s — %(message)s",
-    handlers=[
-        logging.FileHandler(BASE_DIR / "sophitek.log"),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+    handlers=[logging.FileHandler(BASE_DIR/"sophitek.log"),
+              logging.StreamHandler(sys.stdout)])
 
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
 # BASE DE DONNÉES
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""CREATE TABLE IF NOT EXISTS contenus (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        type        TEXT DEFAULT 'livre',
-        titre       TEXT NOT NULL,
-        auteur      TEXT DEFAULT 'Japhet Arcade Sophiano ASSOGBA',
-        genre       TEXT DEFAULT '',
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT DEFAULT 'livre',
+        titre TEXT NOT NULL,
+        auteur TEXT DEFAULT 'Japhet Arcade Sophiano ASSOGBA',
+        genre TEXT DEFAULT '',
         description TEXT DEFAULT '',
-        extrait     TEXT DEFAULT '',
-        prix        INTEGER DEFAULT 1000,
-        gratuit     INTEGER DEFAULT 0,
-        couverture  TEXT DEFAULT '',
-        lien_drive  TEXT DEFAULT '',
-        lien_media  TEXT DEFAULT '',
-        actif       INTEGER DEFAULT 1,
-        date_ajout  TEXT DEFAULT ''
+        extrait TEXT DEFAULT '',
+        prix INTEGER DEFAULT 1000,
+        gratuit INTEGER DEFAULT 0,
+        couverture TEXT DEFAULT '',
+        lien_drive TEXT DEFAULT '',
+        lien_media TEXT DEFAULT '',
+        actif INTEGER DEFAULT 1,
+        date_ajout TEXT DEFAULT ''
     )""")
     c.execute("""CREATE TABLE IF NOT EXISTS commentaires (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         contenu_id INTEGER NOT NULL,
-        nom        TEXT NOT NULL,
-        texte      TEXT NOT NULL,
-        date_com   TEXT DEFAULT '',
-        approuve   INTEGER DEFAULT 1
+        nom TEXT NOT NULL,
+        texte TEXT NOT NULL,
+        date_com TEXT DEFAULT '',
+        approuve INTEGER DEFAULT 1
     )""")
-    c.execute("""CREATE TABLE IF NOT EXISTS commandes (
-        id             INTEGER PRIMARY KEY AUTOINCREMENT,
-        contenu_id     INTEGER,
-        transaction_id TEXT UNIQUE,
-        telephone      TEXT,
-        montant        INTEGER,
-        statut         TEXT DEFAULT 'en_attente',
-        token_dl       TEXT UNIQUE,
-        telecharge     INTEGER DEFAULT 0,
-        date_cmd       TEXT DEFAULT '',
-        date_paiement  TEXT DEFAULT ''
-    )""")
-    conn.commit()
-    conn.close()
-    logging.info("Base de données initialisée")
+    conn.commit(); conn.close()
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_contenus(type_filtre=None):
+def get_contenus(type_f=None):
     conn = get_db()
-    if type_filtre:
-        rows = conn.execute(
-            "SELECT * FROM contenus WHERE actif=1 AND type=? ORDER BY id DESC",
-            (type_filtre,)).fetchall()
+    if type_f:
+        rows = conn.execute("SELECT * FROM contenus WHERE actif=1 AND type=? ORDER BY id DESC",(type_f,)).fetchall()
     else:
-        rows = conn.execute(
-            "SELECT * FROM contenus WHERE actif=1 ORDER BY id DESC").fetchall()
+        rows = conn.execute("SELECT * FROM contenus WHERE actif=1 ORDER BY id DESC").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-def get_commentaires(contenu_id):
+def get_commentaires(cid):
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM commentaires WHERE contenu_id=? AND approuve=1 ORDER BY id DESC",
-        (contenu_id,)).fetchall()
+    rows = conn.execute("SELECT * FROM commentaires WHERE contenu_id=? AND approuve=1 ORDER BY id DESC",(cid,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 def add_contenu(d):
     conn = get_db()
     c = conn.execute("""INSERT INTO contenus
-        (type,titre,auteur,genre,description,extrait,prix,gratuit,
-         couverture,lien_drive,lien_media,date_ajout)
+        (type,titre,auteur,genre,description,extrait,prix,gratuit,couverture,lien_drive,lien_media,date_ajout)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (d["type"], d["titre"], d["auteur"], d["genre"],
-         d["description"], d["extrait"], d["prix"], d["gratuit"],
-         d["couverture"], d["lien_drive"], d["lien_media"],
+        (d["type"],d["titre"],d["auteur"],d["genre"],d["description"],d["extrait"],
+         d["prix"],d["gratuit"],d["couverture"],d["lien_drive"],d["lien_media"],
          datetime.now().strftime("%Y-%m-%d")))
-    lid = c.lastrowid
-    conn.commit()
-    conn.close()
-    logging.info(f"Contenu ajouté : {d['titre']}")
+    lid = c.lastrowid; conn.commit(); conn.close()
     return lid
 
 def update_contenu(lid, d):
     conn = get_db()
-    conn.execute("""UPDATE contenus SET
-        type=?,titre=?,auteur=?,genre=?,description=?,extrait=?,prix=?,
-        gratuit=?,couverture=?,lien_drive=?,lien_media=? WHERE id=?""",
-        (d["type"], d["titre"], d["auteur"], d["genre"],
-         d["description"], d["extrait"], d["prix"], d["gratuit"],
-         d["couverture"], d["lien_drive"], d["lien_media"], lid))
-    conn.commit()
-    conn.close()
+    conn.execute("""UPDATE contenus SET type=?,titre=?,auteur=?,genre=?,description=?,
+        extrait=?,prix=?,gratuit=?,couverture=?,lien_drive=?,lien_media=? WHERE id=?""",
+        (d["type"],d["titre"],d["auteur"],d["genre"],d["description"],d["extrait"],
+         d["prix"],d["gratuit"],d["couverture"],d["lien_drive"],d["lien_media"],lid))
+    conn.commit(); conn.close()
 
 def delete_contenu(lid):
     conn = get_db()
-    conn.execute("UPDATE contenus SET actif=0 WHERE id=?", (lid,))
-    conn.commit()
-    conn.close()
+    conn.execute("UPDATE contenus SET actif=0 WHERE id=?",(lid,))
+    conn.commit(); conn.close()
 
-def add_commentaire(contenu_id, nom, texte):
+def add_commentaire(cid, nom, texte):
     conn = get_db()
-    conn.execute(
-        "INSERT INTO commentaires (contenu_id,nom,texte,date_com) VALUES(?,?,?,?)",
-        (contenu_id, nom, texte, datetime.now().strftime("%Y-%m-%d %H:%M")))
-    conn.commit()
-    conn.close()
+    conn.execute("INSERT INTO commentaires (contenu_id,nom,texte,date_com) VALUES(?,?,?,?)",
+        (cid,nom,texte,datetime.now().strftime("%Y-%m-%d %H:%M")))
+    conn.commit(); conn.close()
 
-def delete_commentaire(com_id):
+def delete_commentaire(cid):
     conn = get_db()
-    conn.execute("DELETE FROM commentaires WHERE id=?", (com_id,))
-    conn.commit()
-    conn.close()
+    conn.execute("DELETE FROM commentaires WHERE id=?",(cid,))
+    conn.commit(); conn.close()
 
 def get_stats():
     conn = get_db()
-    total   = conn.execute("SELECT COUNT(*) FROM contenus WHERE actif=1").fetchone()[0]
-    gratuit = conn.execute("SELECT COUNT(*) FROM contenus WHERE actif=1 AND gratuit=1").fetchone()[0]
-    ventes  = conn.execute("SELECT COUNT(*) FROM commandes WHERE statut='paye'").fetchone()[0]
-    revenus = conn.execute("SELECT SUM(montant) FROM commandes WHERE statut='paye'").fetchone()[0] or 0
-    coms    = conn.execute("SELECT COUNT(*) FROM commentaires WHERE approuve=1").fetchone()[0]
+    t = conn.execute("SELECT COUNT(*) FROM contenus WHERE actif=1").fetchone()[0]
+    g = conn.execute("SELECT COUNT(*) FROM contenus WHERE actif=1 AND gratuit=1").fetchone()[0]
+    c = conn.execute("SELECT COUNT(*) FROM commentaires WHERE approuve=1").fetchone()[0]
     conn.close()
-    return {"total": total, "gratuit": gratuit, "ventes": ventes,
-            "revenus": revenus, "commentaires": coms}
+    return {"total":t,"gratuit":g,"payant":t-g,"commentaires":c}
 
-def token_unique(cid):
-    raw = f"{cid}{datetime.now().isoformat()}{os.urandom(16).hex()}"
-    return hashlib.sha256(raw.encode()).hexdigest()
-
-# ════════════════════════════════════════════════════════════
-# GÉNÉRATEUR HTML
-# ════════════════════════════════════════════════════════════
-def generer_html(contenus):
-    cartes = ""
-    ICONS = {"livre":"📚","app":"💻","audio":"🎵","video":"🎬","autre":"📦"}
-
+# ════════════════════════════════════════
+# JSON EXPORT
+# ════════════════════════════════════════
+def exporter_json():
+    contenus = get_contenus()
+    data = []
     for b in contenus:
-        cover  = ("covers/" + Path(b["couverture"]).name) if b["couverture"] else "covers/placeholder.jpg"
-        badge  = "GRATUIT" if b["gratuit"] else (str(b["prix"]) + " FCFA" if b["prix"] else "")
-        bcls   = "free" if b["gratuit"] else ("paid" if b["prix"] else "")
-        icon   = ICONS.get(b["type"], "📦")
-        coms   = get_commentaires(b["id"])
-        nb_com = len(coms)
+        b["gratuit"] = bool(b["gratuit"])
+        b["commentaires"] = get_commentaires(b["id"])
+        if LOGO_PATH.exists():
+            b["logo"] = "logo.png"
+        data.append(b)
+    JSON_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return data
 
-        # Bouton extrait
-        btns = ""
-        if b["extrait"]:
-            ext_safe = b["extrait"].replace("\\","\\\\").replace("'","\\'").replace("\n","\\n").replace("\r","")
-            tit_safe = b["titre"].replace("'","\\'")
-            btns += f'<button class="btn ext-btn" onclick="voirExtrait(\'{ext_safe}\',\'{tit_safe}\')">📖 Lire un extrait</button>'
-
-        # Bouton discuter
-        msg_disc = req.utils.quote("Bonjour, je voudrais en savoir plus sur : " + b["titre"])
-        btns += f'<a href="https://wa.me/{CONFIG["WHATSAPP"]}?text={msg_disc}" target="_blank" class="btn disc-btn">💬 Discuter</a>'
-
-        # Bouton action principal
-        if b["gratuit"] and b["lien_drive"]:
-            btns += f'<a href="{b["lien_drive"]}" target="_blank" class="btn free-btn">↓ Télécharger gratuitement</a>'
-        elif b["type"] in ("audio","video") and b["lien_media"]:
-            if b["gratuit"]:
-                btns += f'<a href="{b["lien_media"]}" target="_blank" class="btn free-btn">▶ Écouter / Voir</a>'
-            else:
-                msg_cmd = req.utils.quote("Bonjour, je souhaite accéder à : " + b["titre"] + " (" + str(b["prix"]) + " FCFA)")
-                btns += f'<a href="https://wa.me/{CONFIG["WHATSAPP"]}?text={msg_cmd}" target="_blank" class="btn buy-btn">🛒 Commander</a>'
-        elif b["type"] == "app":
-            if b["gratuit"] and b["lien_drive"]:
-                btns += f'<a href="{b["lien_drive"]}" target="_blank" class="btn free-btn">↓ Télécharger</a>'
-            elif b["prix"]:
-                msg_app = req.utils.quote("Bonjour, je veux acquérir : " + b["titre"] + " (" + str(b["prix"]) + " FCFA)")
-                btns += f'<a href="https://wa.me/{CONFIG["WHATSAPP"]}?text={msg_app}" target="_blank" class="btn buy-btn">🛒 Commander</a>'
-        elif not b["gratuit"] and b["prix"]:
-            btns += '<button class="btn buy-btn" onclick="acheter(' + str(b["id"]) + ',' + str(b["prix"]) + ',\'' + b["titre"].replace("'","\\'") + '\')">🛒 Acheter — ' + str(b["prix"]) + ' FCFA</button>'
-
-        # Commentaires HTML
-        coms_html = ""
-        for cm in coms[:3]:
-            coms_html += f'<div class="ci"><span class="cn">{cm["nom"]}</span><span class="cd">{cm["date_com"][:10]}</span><p class="ct">{cm["texte"]}</p></div>'
-
-        badge_html = f'<span class="badge {bcls}">{badge}</span>' if badge else ""
-        desc_court = b["description"][:150] + ("..." if len(b["description"]) > 150 else "")
-
-        cartes += f"""<div class="card" data-type="{b['type']}">
-<div class="cw"><img src="{cover}" alt="{b['titre']}" loading="lazy"/>{badge_html}<span class="ti">{icon}</span></div>
-<div class="cb">
-<span class="gt">{b['genre']}</span><h3>{b['titre']}</h3>
-<p class="au">{b['auteur']}</p><p class="de">{desc_court}</p>
-<div class="btns">{btns}</div>
-<div class="cs"><div class="ct2" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display=='none'?'block':'none'">💬 {nb_com} commentaire{'s' if nb_com!=1 else ''}</div>
-<div class="cb2" style="display:none">{coms_html}
-<div class="cf"><input class="ci2" placeholder="Votre nom" id="n{b['id']}"/><textarea class="ci2" placeholder="Votre commentaire..." id="t{b['id']}" rows="2"></textarea>
-<button class="bc" onclick="envoyerCom({b['id']})">Envoyer</button></div></div></div>
-</div></div>"""
-
-    genres  = sorted(set(b["type"] for b in contenus))
-    LABELS  = {"livre":"📚 Livres","app":"💻 Apps","audio":"🎵 Audios","video":"🎬 Vidéos","autre":"📦 Autres"}
-    filtres = '<button class="f active" data-f="tous">Tous</button>'
-    for g in genres:
-        filtres += f'<button class="f" data-f="{g}">{LABELS.get(g,g)}</button>'
-
-    s = get_stats()
-    vide = '<div class="empty">Aucun contenu disponible pour le moment.<br/>Revenez bientôt !</div>' if not contenus else ""
-
-    return """<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Sophitek Studio — Boutique</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Cormorant+Garamond:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
-<style>
-:root{--n:#0a0a0a;--g:#141414;--g2:#1e1e1e;--g3:#2a2a2a;--r:#c0392b;--r2:#e74c3c;--b:#f5f0e8;--t:#b8b0a8;--v:#27ae60;--or:#b8960c;--bl:#2471a3;}
-*{margin:0;padding:0;box-sizing:border-box;}
-html{scroll-behavior:smooth;}
-body{background:var(--n);color:var(--b);font-family:'Cormorant Garamond',serif;min-height:100vh;}
-/* ── HEADER */
-header{text-align:center;padding:70px 20px 40px;position:relative;overflow:hidden;border-bottom:1px solid rgba(192,57,43,.25);}
-header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(192,57,43,.15) 0%,transparent 70%);pointer-events:none;}
-.stag{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:6px;color:var(--r);text-transform:uppercase;margin-bottom:16px;opacity:.9;}
-h1{font-family:'Playfair Display',serif;font-size:clamp(44px,9vw,96px);font-weight:900;line-height:.88;letter-spacing:-2px;color:var(--b);}
-h1 em{color:var(--r);font-style:normal;}
-.hsub{font-size:15px;font-weight:300;color:var(--t);letter-spacing:3px;margin-top:18px;}
-/* ── STATS */
-.stats{display:flex;justify-content:center;gap:0;background:var(--g);border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap;}
-.stat{text-align:center;padding:18px 32px;border-right:1px solid rgba(255,255,255,.06);}
-.stat:last-child{border-right:none;}
-.sn{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--r);display:block;line-height:1;}
-.sl{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--t);text-transform:uppercase;margin-top:4px;display:block;}
-/* ── FILTRES */
-.filters{display:flex;justify-content:center;gap:8px;padding:28px 16px;flex-wrap:wrap;}
-.f{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:8px 18px;border:1px solid rgba(192,57,43,.3);background:transparent;color:var(--t);cursor:pointer;transition:all .25s;border-radius:0;}
-.f:hover,.f.active{background:var(--r);color:#fff;border-color:var(--r);}
-/* ── GRILLE */
-main{max-width:1380px;margin:0 auto;padding:0 24px 100px;}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:28px;}
-.card{background:var(--g);border:1px solid rgba(255,255,255,.06);transition:all .3s;position:relative;}
-.card:hover{border-color:rgba(192,57,43,.35);transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.4);}
-.card.hidden{display:none;}
-/* Cover */
-.cw{position:relative;aspect-ratio:2/3;overflow:hidden;background:var(--g3);}
-.cw img{width:100%;height:100%;object-fit:cover;transition:.6s;}
-.card:hover .cw img{transform:scale(1.05);}
-.badge{position:absolute;top:12px;right:12px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;padding:4px 10px;color:#fff;letter-spacing:1px;}
-.badge.free{background:var(--v);}
-.badge.paid{background:var(--r);}
-.ti{position:absolute;top:12px;left:12px;font-size:16px;background:rgba(0,0,0,.65);padding:4px 7px;backdrop-filter:blur(4px);}
-/* Body */
-.cb{padding:16px;}
-.gt{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--r);text-transform:uppercase;}
-h3{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--b);line-height:1.2;margin:6px 0 4px;}
-.au{font-size:12px;color:var(--t);margin-bottom:8px;font-style:italic;}
-.de{font-size:13px;color:var(--t);line-height:1.6;margin-bottom:12px;}
-/* Boutons */
-.btns{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
-.btn{display:block;width:100%;padding:10px 14px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;text-align:center;text-decoration:none;border:none;cursor:pointer;transition:all .2s;font-weight:700;}
-.buy-btn{background:var(--r);color:#fff;}
-.buy-btn:hover{background:var(--r2);}
-.free-btn{background:var(--v);color:#fff;}
-.free-btn:hover{background:#2ecc71;}
-.disc-btn{background:transparent;color:var(--t);border:1px solid rgba(255,255,255,.15);}
-.disc-btn:hover{background:#25D366;color:#fff;border-color:#25D366;}
-.ext-btn{background:var(--g3);color:var(--b);border:1px solid rgba(255,255,255,.12);}
-.ext-btn:hover{background:var(--or);border-color:var(--or);}
-/* Commentaires */
-.cs{border-top:1px solid rgba(255,255,255,.07);padding-top:10px;}
-.ct2{font-family:'Space Mono',monospace;font-size:9px;color:var(--t);cursor:pointer;padding:4px 0;letter-spacing:2px;}
-.ct2:hover{color:var(--b);}
-.cb2{margin-top:8px;}
-.ci{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);}
-.cn{font-family:'Space Mono',monospace;font-size:10px;color:var(--r);font-weight:700;}
-.cd{font-family:'Space Mono',monospace;font-size:9px;color:rgba(255,255,255,.3);margin-left:8px;}
-.ct{font-size:12px;color:var(--t);margin-top:4px;line-height:1.5;}
-.cf{margin-top:10px;display:flex;flex-direction:column;gap:6px;}
-.ci2{background:var(--g3);border:1px solid rgba(255,255,255,.1);color:var(--b);font-family:'Cormorant Garamond',serif;font-size:13px;padding:8px 10px;outline:none;resize:none;width:100%;}
-.ci2:focus{border-color:var(--r);}
-.bc{background:var(--bl);color:#fff;border:none;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;padding:8px;cursor:pointer;transition:.2s;width:100%;}
-.bc:hover{background:#2980b9;}
-/* Empty */
-.empty{text-align:center;padding:100px 20px;color:rgba(255,255,255,.25);font-family:'Space Mono',monospace;font-size:12px;letter-spacing:3px;line-height:2;grid-column:1/-1;}
-/* ── MODALS */
-.mov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:1000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);}
-.mov.open{display:flex;}
-/* Modal extrait */
-.mext{background:var(--g);border:1px solid rgba(192,57,43,.35);max-width:680px;width:100%;max-height:88vh;overflow-y:auto;padding:36px;position:relative;}
-.mext h2{font-family:'Playfair Display',serif;font-size:24px;color:var(--b);margin-bottom:20px;padding-right:32px;border-bottom:1px solid rgba(192,57,43,.2);padding-bottom:14px;}
-.mtxt{font-size:16px;color:var(--t);line-height:2;white-space:pre-wrap;}
-/* Modal paiement */
-.mpay{background:var(--g);border:1px solid rgba(192,57,43,.35);max-width:440px;width:100%;padding:36px;position:relative;}
-.mclose{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--t);font-size:24px;cursor:pointer;line-height:1;}
-.mclose:hover{color:var(--b);}
-.ptit{font-family:'Playfair Display',serif;font-size:22px;color:var(--b);margin-bottom:6px;}
-.pprix{font-family:'Playfair Display',serif;font-size:32px;font-weight:900;color:var(--r);margin-bottom:20px;}
-.plbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--t);text-transform:uppercase;display:block;margin-bottom:6px;}
-.pinp{width:100%;background:var(--g3);border:1px solid rgba(255,255,255,.1);color:var(--b);font-size:20px;padding:12px 14px;outline:none;margin-bottom:16px;font-family:'Cormorant Garamond',serif;}
-.pinp:focus{border-color:var(--r);}
-.pbtn{width:100%;background:var(--r);color:#fff;border:none;font-family:'Space Mono',monospace;font-size:12px;letter-spacing:3px;text-transform:uppercase;padding:15px;cursor:pointer;transition:.2s;font-weight:700;}
-.pbtn:hover{background:var(--r2);}
-.pstat{text-align:center;padding:8px 0;font-size:13px;color:var(--t);line-height:1.7;}
-.spin{width:44px;height:44px;border:3px solid rgba(192,57,43,.25);border-top-color:var(--r);border-radius:50%;animation:sp 1s linear infinite;margin:12px auto;}
-@keyframes sp{to{transform:rotate(360deg);}}
-.pok{font-size:52px;margin:8px 0;}
-.psucc{font-family:'Playfair Display',serif;font-size:22px;color:var(--v);margin-bottom:12px;}
-.pdl{display:block;width:100%;background:var(--v);color:#fff;text-decoration:none;text-align:center;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;padding:15px;transition:.2s;font-weight:700;}
-.pdl:hover{background:#2ecc71;}
-.pwarn{font-family:'Space Mono',monospace;font-size:9px;color:rgba(255,255,255,.3);text-align:center;margin-top:8px;letter-spacing:2px;}
-.perr{font-size:40px;margin:8px 0;}
-.perrt{color:var(--r2);margin-bottom:16px;font-family:'Playfair Display',serif;font-size:18px;}
-.pret{background:transparent;border:1px solid var(--r);color:var(--r);font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;padding:10px 24px;cursor:pointer;transition:.2s;}
-.pret:hover{background:var(--r);color:#fff;}
-/* ── FOOTER */
-footer{text-align:center;padding:40px;border-top:1px solid rgba(255,255,255,.06);}
-footer p{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;color:rgba(255,255,255,.25);text-transform:uppercase;}
-footer em{color:var(--r);font-style:normal;}
-/* ── RESPONSIVE */
-@media(max-width:640px){
-  h1{font-size:clamp(36px,11vw,60px);}
-  .grid{grid-template-columns:repeat(2,1fr);gap:14px;}
-  .stat{padding:14px 20px;}
-  .sn{font-size:22px;}
-  main{padding:0 12px 80px;}
-}
-</style>
-</head>
-<body>
-
-<header>
-  <div class="stag">Sophitek Studio — Boutique Officielle</div>
-  <h1>SOPHITEK<br/><em>STUDIO</em></h1>
-  <p class="hsub">Japhet Arcade Sophiano ASSOGBA</p>
-</header>
-
-<div class="stats">""" + f"""
-  <div class="stat"><span class="sn">{s['total']}</span><span class="sl">Contenus</span></div>
-  <div class="stat"><span class="sn">{s['gratuit']}</span><span class="sl">Gratuits</span></div>
-  <div class="stat"><span class="sn">{s['ventes']}</span><span class="sl">Ventes</span></div>
-  <div class="stat"><span class="sn">{s['revenus']:,}</span><span class="sl">FCFA</span></div>
-  <div class="stat"><span class="sn">{s['commentaires']}</span><span class="sl">Avis</span></div>
-</div>
-
-<div class="filters">{filtres}</div>
-<main><div class="grid" id="grid">{cartes}{vide}</div></main>
-
-<footer><p>© 2026 <em>Sophitek Studio</em> — Tous droits réservés</p></footer>
-
-<!-- Modal Extrait -->
-<div class="mov" id="mext-ov">
-  <div class="mext">
-    <button class="mclose" onclick="ferm('mext-ov')">✕</button>
-    <h2 id="ext-tit"></h2>
-    <div class="mtxt" id="ext-txt"></div>
-  </div>
-</div>
-
-<!-- Modal Paiement -->
-<div class="mov" id="mpay-ov">
-  <div class="mpay">
-    <button class="mclose" onclick="ferm('mpay-ov')">✕</button>
-    <div class="ptit" id="p-tit"></div>
-    <div class="pprix" id="p-prix"></div>
-    <div id="ps1">
-      <span class="plbl">Votre numéro MTN / Moov Money</span>
-      <input class="pinp" id="p-tel" placeholder="ex : 67 00 00 00" maxlength="12"/>
-      <button class="pbtn" onclick="payerNow()">💳 &nbsp;Payer maintenant</button>
-    </div>
-    <div id="ps2" style="display:none;text-align:center">
-      <div class="spin"></div>
-      <p class="pstat">Un message de validation a été envoyé<br/>sur votre téléphone.<br/>Validez et patientez...</p>
-    </div>
-    <div id="ps3" style="display:none;text-align:center">
-      <div class="pok">✅</div>
-      <div class="psucc">Paiement confirmé !</div>
-      <a class="pdl" id="p-dl" href="#" target="_blank">↓ &nbsp;Télécharger mon livre</a>
-      <p class="pwarn">⚠ Lien valide pour 1 seul téléchargement</p>
-    </div>
-    <div id="ps4" style="display:none;text-align:center">
-      <div class="perr">❌</div>
-      <div class="perrt">Paiement non abouti</div>
-      <p class="pstat">Vérifiez votre solde et réessayez.</p>
-      <button class="pret" onclick="rstPay()">↺ Réessayer</button>
-    </div>
-  </div>
-</div>
-
-<script>
-const API='{CONFIG['RENDER_URL']}';
-let payId=null,cmdId=null,pollT=null;
-
-// Filtres
-document.querySelectorAll('.f').forEach(b=>b.addEventListener('click',()=>{{
-  document.querySelectorAll('.f').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active');
-  const f=b.dataset.f;
-  document.querySelectorAll('.card').forEach(c=>c.classList.toggle('hidden',f!=='tous'&&c.dataset.type!==f));
-}}));
-
-// Extrait
-function voirExtrait(txt,tit){{document.getElementById('ext-tit').textContent=tit;document.getElementById('ext-txt').textContent=txt;document.getElementById('mext-ov').classList.add('open');}}
-
-// Commentaires
-async function envoyerCom(id){{
-  const nom=document.getElementById('n'+id).value.trim();
-  const txt=document.getElementById('t'+id).value.trim();
-  if(!nom||!txt){{alert('Remplissez votre nom et commentaire.');return;}}
-  try{{
-    await fetch(API+'/commentaire',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{contenu_id:id,nom,texte:txt}})}});
-    document.getElementById('n'+id).value='';document.getElementById('t'+id).value='';
-    alert('Merci ! Votre commentaire a bien été envoyé.');
-  }}catch(e){{alert('Erreur réseau. Réessayez.');}}
-}}
-
-// Paiement
-function acheter(id,prix,titre){{
-  payId=id;
-  document.getElementById('p-tit').textContent=titre;
-  document.getElementById('p-prix').textContent=prix+' FCFA';
-  rstPay();
-  document.getElementById('mpay-ov').classList.add('open');
-}}
-
-async function payerNow(){{
-  const tel=document.getElementById('p-tel').value.trim();
-  if(!tel||tel.length<8){{alert('Entrez un numéro valide.');return;}}
-  showPs(2);
-  try{{
-    const r=await fetch(API+'/acheter/'+payId,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{telephone:tel}})}});
-    const d=await r.json();
-    if(!d.success)throw new Error(d.erreur||'Erreur');
-    cmdId=d.commande_id;
-    let n=0;
-    pollT=setInterval(async()=>{{
-      if(++n>72){{clearInterval(pollT);showPs(4);return;}}
-      const rv=await fetch(API+'/verifier/'+cmdId);
-      const dv=await rv.json();
-      if(dv.statut==='paye'){{clearInterval(pollT);document.getElementById('p-dl').href=dv.lien;showPs(3);}}
-      else if(dv.statut==='echec'){{clearInterval(pollT);showPs(4);}}
-    }},5000);
-  }}catch(e){{showPs(4);}}
-}}
-
-function showPs(n){{[1,2,3,4].forEach(i=>document.getElementById('ps'+i).style.display=i===n?'block':'none');}}
-function rstPay(){{if(pollT)clearInterval(pollT);cmdId=null;document.getElementById('p-tel').value='';showPs(1);}}
-function ferm(id){{document.getElementById(id).classList.remove('open');if(id==='mpay-ov')rstPay();}}
-document.querySelectorAll('.mov').forEach(m=>m.addEventListener('click',e=>{{ if(e.target===m)ferm(m.id); }}));
-document.addEventListener('keydown',e=>{{ if(e.key==='Escape')document.querySelectorAll('.mov.open').forEach(m=>ferm(m.id)); }});
-</script>
-</body></html>"""
-
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
 # GITHUB
-# ════════════════════════════════════════════════════════════
-def github_push(contenu_bytes, chemin_repo, message):
-    token   = CONFIG["GITHUB_TOKEN"]
-    repo    = CONFIG["GITHUB_REPO"]
-    url     = f"https://api.github.com/repos/{repo}/contents/{chemin_repo}"
-    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
-    b64 = base64.b64encode(contenu_bytes).decode()
-    sha = None
-    r = req.get(url, headers=headers, timeout=15)
+# ════════════════════════════════════════
+def github_push(contenu_bytes, chemin, message):
+    token = CONFIG["GITHUB_TOKEN"]
+    repo  = CONFIG["GITHUB_REPO"]
+    url   = f"https://api.github.com/repos/{repo}/contents/{chemin}"
+    hdrs  = {"Authorization":f"token {token}","Accept":"application/vnd.github+json"}
+    b64   = base64.b64encode(contenu_bytes).decode()
+    sha   = None
+    r = req.get(url, headers=hdrs, timeout=15)
     if r.status_code == 200:
         sha = r.json().get("sha")
-    payload = {"message": message, "content": b64}
-    if sha:
-        payload["sha"] = sha
-    r = req.put(url, json=payload, headers=headers, timeout=20)
-    if r.status_code in (200, 201):
-        return True, f"✓ {chemin_repo}"
-    return False, f"✗ {chemin_repo} : {r.json().get('message','Erreur')}"
+    payload = {"message":message,"content":b64}
+    if sha: payload["sha"] = sha
+    r = req.put(url, json=payload, headers=hdrs, timeout=20)
+    if r.status_code in (200,201):
+        return True, f"✓ {chemin}"
+    return False, f"✗ {chemin} : {r.json().get('message','Erreur')}"
 
-def github_get_json(chemin_repo):
-    token   = CONFIG["GITHUB_TOKEN"]
-    repo    = CONFIG["GITHUB_REPO"]
-    url     = f"https://api.github.com/repos/{repo}/contents/{chemin_repo}"
-    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
-    r = req.get(url, headers=headers, timeout=15)
+def github_get(chemin):
+    token = CONFIG["GITHUB_TOKEN"]
+    repo  = CONFIG["GITHUB_REPO"]
+    url   = f"https://api.github.com/repos/{repo}/contents/{chemin}"
+    hdrs  = {"Authorization":f"token {token}","Accept":"application/vnd.github+json"}
+    r = req.get(url, headers=hdrs, timeout=15)
     if r.status_code == 200:
         return base64.b64decode(r.json().get("content",""))
     return None
 
-def publier_site(callback):
-    contenus = get_contenus()
+def publier(callback):
     msgs, errors = [], []
     # HTML
-    html = generer_html(contenus)
-    HTML_PATH.write_text(html, encoding="utf-8")
-    ok, msg = github_push(html.encode("utf-8"), "index.html",
-                          f"Mise à jour — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    ok,msg = github_push(HTML_PATH.read_bytes(),"index.html",
+        f"Mise à jour — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     (msgs if ok else errors).append(msg)
     # JSON
-    data = [{**b, "gratuit": bool(b["gratuit"])} for b in contenus]
-    json_str = json.dumps(data, ensure_ascii=False, indent=2)
-    JSON_PATH.write_text(json_str, encoding="utf-8")
-    ok, msg = github_push(json_str.encode("utf-8"), "data.json",
-                          f"Données — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    data = exporter_json()
+    ok,msg = github_push(JSON_PATH.read_bytes(),"data.json",
+        f"Données — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     (msgs if ok else errors).append(msg)
+    # Logo
+    if LOGO_PATH.exists():
+        ok,msg = github_push(LOGO_PATH.read_bytes(),"logo.png","Logo Sophitek Studio")
+        (msgs if ok else errors).append(msg)
     # Couvertures
     for cover in COVERS_DIR.iterdir():
         if cover.is_file() and cover.suffix.lower() in (".jpg",".jpeg",".png",".webp"):
-            ok, msg = github_push(cover.read_bytes(), f"covers/{cover.name}",
-                                  f"Cover : {cover.name}")
+            ok,msg = github_push(cover.read_bytes(),f"covers/{cover.name}",f"Cover:{cover.name}")
             (msgs if ok else errors).append(msg)
-    logging.info(f"Publication : {len(msgs)} ok, {len(errors)} erreurs")
     callback(msgs, errors)
 
 def synchroniser(callback):
     try:
-        data_bytes = github_get_json("data.json")
+        data_bytes = github_get("data.json")
         if not data_bytes:
-            callback(False, "Fichier data.json introuvable sur GitHub")
-            return
+            callback(False,"Fichier data.json introuvable"); return
         data = json.loads(data_bytes.decode("utf-8"))
         conn = get_db()
         for b in data:
-            exists = conn.execute("SELECT id FROM contenus WHERE id=?", (b["id"],)).fetchone()
+            exists = conn.execute("SELECT id FROM contenus WHERE id=?",(b["id"],)).fetchone()
             if exists:
                 conn.execute("""UPDATE contenus SET type=?,titre=?,auteur=?,genre=?,
                     description=?,extrait=?,prix=?,gratuit=?,couverture=?,
@@ -603,154 +250,44 @@ def synchroniser(callback):
                      b.get("prix",0),int(b.get("gratuit",False)),b.get("couverture",""),
                      b.get("lien_drive",""),b.get("lien_media",""),b.get("actif",1),
                      b.get("date_ajout","")))
-        conn.commit()
-        conn.close()
-        callback(True, f"✓ {len(data)} contenus synchronisés depuis GitHub")
+        conn.commit(); conn.close()
+        callback(True,f"✓ {len(data)} contenus synchronisés")
     except Exception as e:
-        callback(False, str(e))
+        callback(False,str(e))
 
 def sauvegarder(callback):
     try:
         script = Path(__file__).read_bytes()
-        ok, msg = github_push(script, "backup/gestionnaire.py",
-                              f"Backup — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        callback(ok, msg)
+        ok,msg = github_push(script,"backup/gestionnaire.py",
+            f"Backup — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        callback(ok,msg)
     except Exception as e:
-        callback(False, str(e))
+        callback(False,str(e))
 
-# ════════════════════════════════════════════════════════════
-# FLASK — API PAIEMENTS
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
+# FLASK
+# ════════════════════════════════════════
 flask_app = Flask(__name__)
 
 @flask_app.route("/")
 def home():
-    return jsonify({"status": "Sophitek Studio API v2", "ok": True})
+    return jsonify({"status":"Sophitek Studio API","version":"3.0"})
 
 @flask_app.route("/contenus")
 def api_contenus():
-    t = request.args.get("type")
-    data = get_contenus(t)
-    return jsonify([{**b, "gratuit": bool(b["gratuit"])} for b in data])
+    data = get_contenus(request.args.get("type"))
+    return jsonify([{**b,"gratuit":bool(b["gratuit"])} for b in data])
 
-@flask_app.route("/commentaire", methods=["POST"])
-def api_commentaire():
-    d   = request.get_json(silent=True) or {}
+@flask_app.route("/commentaire",methods=["POST"])
+def api_com():
+    d = request.get_json(silent=True) or {}
     cid = d.get("contenu_id")
     nom = str(d.get("nom","")).strip()[:60]
     txt = str(d.get("texte","")).strip()[:500]
     if not cid or not nom or not txt:
-        return jsonify({"erreur": "Données manquantes"}), 400
-    add_commentaire(cid, nom, txt)
-    return jsonify({"success": True})
-
-@flask_app.route("/acheter/<int:cid>", methods=["POST"])
-def api_acheter(cid):
-    conn = get_db()
-    item = conn.execute("SELECT * FROM contenus WHERE id=? AND actif=1", (cid,)).fetchone()
-    conn.close()
-    if not item:
-        return jsonify({"erreur": "Introuvable"}), 404
-    item = dict(item)
-    d    = request.get_json(silent=True) or {}
-    tel  = str(d.get("telephone","")).strip()
-    if not tel or len(tel) < 8:
-        return jsonify({"erreur": "Numéro invalide"}), 400
-    conn = get_db()
-    c = conn.execute("""INSERT INTO commandes (contenu_id,telephone,montant,statut,date_cmd)
-        VALUES(?,?,?,'en_attente',?)""",
-        (cid, tel, item["prix"], datetime.now().isoformat()))
-    cmd_id = c.lastrowid
-    conn.commit()
-    conn.close()
-    # Créer transaction FedaPay
-    try:
-        headers = {"Authorization": f"Bearer {CONFIG['FEDAPAY_KEY']}",
-                   "Content-Type": "application/json"}
-        payload = {
-            "description": f"Achat — {item['titre']}",
-            "amount": item["prix"],
-            "currency": {"iso": "XOF"},
-            "callback_url": f"{CONFIG['RENDER_URL']}/webhook",
-            "customer": {"phone_number": {"number": tel, "country": "BJ"}},
-            "meta": {"commande_id": cmd_id, "contenu_id": cid}
-        }
-        r = req.post("https://api.fedapay.com/v1/transactions",
-                     json=payload, headers=headers, timeout=15)
-        r.raise_for_status()
-        tid = str(r.json()["v1/transaction"]["id"])
-        conn = get_db()
-        conn.execute("UPDATE commandes SET transaction_id=? WHERE id=?", (tid, cmd_id))
-        conn.commit()
-        conn.close()
-        logging.info(f"Transaction FedaPay créée : {tid}")
-        return jsonify({"success": True, "commande_id": cmd_id})
-    except Exception as e:
-        logging.error(f"Erreur FedaPay : {e}")
-        conn = get_db()
-        conn.execute("DELETE FROM commandes WHERE id=?", (cmd_id,))
-        conn.commit()
-        conn.close()
-        return jsonify({"erreur": "Erreur paiement. Réessayez."}), 500
-
-@flask_app.route("/verifier/<int:cmd_id>")
-def api_verifier(cmd_id):
-    conn = get_db()
-    cmd  = conn.execute("SELECT * FROM commandes WHERE id=?", (cmd_id,)).fetchone()
-    conn.close()
-    if not cmd:
-        return jsonify({"erreur": "Introuvable"}), 404
-    cmd = dict(cmd)
-    if cmd["statut"] == "paye" and cmd["token_dl"]:
-        return jsonify({"statut": "paye",
-                        "lien": f"{CONFIG['RENDER_URL']}/dl/{cmd['token_dl']}"})
-    elif cmd["statut"] == "echec":
-        return jsonify({"statut": "echec"})
-    return jsonify({"statut": "en_attente"})
-
-@flask_app.route("/webhook", methods=["POST"])
-def api_webhook():
-    data   = request.get_json(silent=True) or {}
-    obj    = data.get("object", {})
-    statut = obj.get("status","")
-    tid    = str(obj.get("id",""))
-    meta   = obj.get("meta", {})
-    cid    = meta.get("commande_id")
-    if not cid:
-        return "OK", 200
-    conn = get_db()
-    if statut == "approved":
-        tok = token_unique(cid)
-        conn.execute("""UPDATE commandes SET statut='paye',transaction_id=?,
-            token_dl=?,date_paiement=? WHERE id=?""",
-            (tid, tok, datetime.now().isoformat(), cid))
-        logging.info(f"Paiement confirmé commande {cid}")
-    elif statut in ("declined","canceled","expired"):
-        conn.execute("UPDATE commandes SET statut='echec' WHERE id=?", (cid,))
-        logging.info(f"Paiement échoué commande {cid}")
-    conn.commit()
-    conn.close()
-    return "OK", 200
-
-@flask_app.route("/dl/<token>")
-def api_dl(token):
-    conn = get_db()
-    row  = conn.execute("""SELECT c.*,co.lien_drive FROM commandes c
-        JOIN contenus co ON c.contenu_id=co.id WHERE c.token_dl=?""", (token,)).fetchone()
-    conn.close()
-    if not row:
-        return "<h2 style='color:red;text-align:center;padding:60px;font-family:Georgia'>Lien invalide.</h2>", 404
-    row = dict(row)
-    if row["telecharge"] >= 1:
-        return "<h2 style='color:red;text-align:center;padding:60px;font-family:Georgia'>Ce lien a déjà été utilisé.</h2>", 400
-    if row["statut"] != "paye":
-        return "<h2 style='color:orange;text-align:center;padding:60px;font-family:Georgia'>Paiement non confirmé.</h2>", 400
-    conn = get_db()
-    conn.execute("UPDATE commandes SET telecharge=telecharge+1 WHERE token_dl=?", (token,))
-    conn.commit()
-    conn.close()
-    logging.info(f"Téléchargement effectué — commande {row['id']}")
-    return redirect(row["lien_drive"])
+        return jsonify({"erreur":"Données manquantes"}),400
+    add_commentaire(cid,nom,txt)
+    return jsonify({"success":True})
 
 @flask_app.route("/admin/stats")
 def api_stats():
@@ -759,345 +296,529 @@ def api_stats():
     return jsonify(get_stats())
 
 def demarrer_flask():
-    flask_app.run(host="0.0.0.0", port=CONFIG["PORT"],
-                  debug=False, use_reloader=False)
+    flask_app.run(host="0.0.0.0",port=CONFIG["PORT"],debug=False,use_reloader=False)
 
-# ════════════════════════════════════════════════════════════
-# TKINTER — MANAGER (PC uniquement)
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
+# PYQT6 — INTERFACE
+# ════════════════════════════════════════
 if not ON_RENDER:
-    import tkinter as tk
-    from tkinter import ttk, messagebox, filedialog
+    from PyQt6.QtWidgets import (
+        QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+        QLabel, QPushButton, QListWidget, QListWidgetItem, QLineEdit,
+        QTextEdit, QCheckBox, QComboBox, QFileDialog, QMessageBox,
+        QFrame, QScrollArea, QSplitter, QTabWidget, QGridLayout,
+        QGroupBox, QDialog, QDialogButtonBox
+    )
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
+    from PyQt6.QtGui import QFont, QIcon, QPixmap, QColor, QPalette
 
-    N="#0a0a0a"; G="#141414"; G2="#1e1e1e"; G3="#2a2a2a"
-    R="#c0392b"; B="#f5f0e8"; T="#b8b0a8"; V="#27ae60"; OR="#b8960c"; BL="#2471a3"
-    TYPES = [("livre","📚 Livre"),("app","💻 Application"),
-             ("audio","🎵 Audio"),("video","🎬 Vidéo"),("autre","📦 Autre")]
+    # ── COULEURS
+    V  = "#6c3fc5"   # violet
+    VC = "#8b5cf6"   # violet clair
+    VP = "#ede9fe"   # violet pale
+    OR = "#c9951a"   # or
+    OC = "#f5c842"   # or clair
+    OP = "#fef9e7"   # or pale
+    BL = "#ffffff"   # blanc
+    GC = "#f7f5ff"   # gris clair
+    TX = "#1a1035"   # texte
+    TD = "#6b7280"   # texte doux
 
-    class App:
-        def __init__(self, root):
-            self.root = root
-            self.root.title("Sophitek Studio — Gestionnaire v2")
-            self.root.geometry("1150x730")
-            self.root.configure(bg=N)
-            self.sel_id    = None
-            self.cover_var = tk.StringVar()
+    STYLE = f"""
+    QMainWindow, QWidget {{ background: {GC}; color: {TX}; font-family: 'Segoe UI'; }}
+    QLabel {{ color: {TX}; }}
+    QLineEdit, QTextEdit, QComboBox {{
+        background: {BL}; border: 1.5px solid {VP}; border-radius: 8px;
+        padding: 8px 12px; color: {TX}; font-size: 13px;
+    }}
+    QLineEdit:focus, QTextEdit:focus {{ border-color: {VC}; }}
+    QComboBox::drop-down {{ border: none; width: 24px; }}
+    QListWidget {{
+        background: {BL}; border: 1.5px solid {VP}; border-radius: 10px;
+        padding: 4px; color: {TX}; font-size: 13px;
+    }}
+    QListWidget::item {{ padding: 10px 12px; border-radius: 8px; margin: 2px; }}
+    QListWidget::item:selected {{ background: {VP}; color: {V}; font-weight: bold; }}
+    QListWidget::item:hover {{ background: {GC}; }}
+    QGroupBox {{
+        background: {BL}; border: 1.5px solid {VP}; border-radius: 12px;
+        margin-top: 12px; padding: 16px; font-weight: bold; color: {V};
+    }}
+    QGroupBox::title {{ subcontrol-position: top left; padding: 0 8px; left: 12px; }}
+    QCheckBox {{ color: {TX}; font-size: 13px; }}
+    QCheckBox::indicator:checked {{ background: {V}; border-radius: 4px; }}
+    QScrollBar:vertical {{ background: {GC}; width: 8px; border-radius: 4px; }}
+    QScrollBar::handle:vertical {{ background: {VP}; border-radius: 4px; }}
+    QTabWidget::pane {{ border: 1.5px solid {VP}; border-radius: 10px; background: {BL}; }}
+    QTabBar::tab {{
+        background: {GC}; padding: 8px 20px; border-radius: 8px 8px 0 0;
+        color: {TD}; font-size: 13px; margin-right: 2px;
+    }}
+    QTabBar::tab:selected {{ background: {BL}; color: {V}; font-weight: bold; }}
+    """
+
+    def btn(text, color=V, text_color=BL, sz=13):
+        b = QPushButton(text)
+        b.setStyleSheet(f"""
+            QPushButton {{
+                background: {color}; color: {text_color};
+                border: none; border-radius: 8px; padding: 10px 16px;
+                font-size: {sz}px; font-weight: 600; cursor: pointer;
+            }}
+            QPushButton:hover {{ opacity: 0.9; }}
+            QPushButton:pressed {{ opacity: 0.8; }}
+        """)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        return b
+
+    def label(text, size=13, bold=False, color=TX):
+        l = QLabel(text)
+        f = QFont("Segoe UI", size)
+        f.setBold(bold)
+        l.setFont(f)
+        l.setStyleSheet(f"color:{color};")
+        return l
+
+    def separateur():
+        f = QFrame()
+        f.setFrameShape(QFrame.Shape.HLine)
+        f.setStyleSheet(f"color:{VP};")
+        return f
+
+    # ── THREAD PUBLICATION
+    class PublierThread(QThread):
+        termine = pyqtSignal(list, list)
+        def run(self):
+            publier(lambda m,e: self.termine.emit(m,e))
+
+    class SyncThread(QThread):
+        termine = pyqtSignal(bool, str)
+        def run(self):
+            synchroniser(lambda ok,msg: self.termine.emit(ok,msg))
+
+    class SaveThread(QThread):
+        termine = pyqtSignal(bool, str)
+        def run(self):
+            sauvegarder(lambda ok,msg: self.termine.emit(ok,msg))
+
+    # ── FENÊTRE PRINCIPALE
+    class SophitekApp(QMainWindow):
+        def __init__(self):
+            super().__init__()
+            self.setWindowTitle("Sophitek Studio — Gestionnaire v3")
+            self.setMinimumSize(1100, 700)
+            self.setStyleSheet(STYLE)
+            self.sel_id = None
+            self.cover_path = ""
             init_db()
-            self._ui()
+            self._build()
             self._charger()
             threading.Thread(target=demarrer_flask, daemon=True).start()
 
-        def _btn(self, p, txt, cmd, bg, sz=11):
-            return tk.Button(p, text=txt, command=cmd, bg=bg, fg=B,
-                             font=("Courier",sz,"bold"), borderwidth=0,
-                             padx=8, pady=5, cursor="hand2",
-                             activebackground=R, activeforeground=B)
+        def _build(self):
+            central = QWidget()
+            self.setCentralWidget(central)
+            main = QVBoxLayout(central)
+            main.setContentsMargins(0,0,0,0)
+            main.setSpacing(0)
 
-        def _field(self, parent, key, label, multi=False):
-            row = tk.Frame(parent, bg=N)
-            row.pack(fill="x", padx=12, pady=3)
-            tk.Label(row, text=label, font=("Courier",9), fg=T, bg=N, anchor="w").pack(fill="x")
-            if multi:
-                w = tk.Text(row, height=3, bg=G2, fg=B, insertbackground=B,
-                            font=("Georgia",11), borderwidth=0, padx=6, pady=4)
-            else:
-                w = tk.Entry(row, bg=G2, fg=B, insertbackground=B,
-                             font=("Georgia",12), borderwidth=0,
-                             highlightthickness=1, highlightbackground=G2, highlightcolor=R)
-            w.pack(fill="x", ipady=0 if multi else 4)
-            self.flds[key] = w
+            # ── HEADER
+            header = QWidget()
+            header.setStyleSheet(f"background:{V}; padding: 0;")
+            header.setFixedHeight(64)
+            hl = QHBoxLayout(header)
+            hl.setContentsMargins(20,0,20,0)
 
-        def _ui(self):
-            # Header
-            hdr = tk.Frame(self.root, bg=G, pady=10)
-            hdr.pack(fill="x")
-            tk.Label(hdr, text="SOPHITEK STUDIO",
-                     font=("Courier",10), fg=R, bg=G).pack()
-            tk.Label(hdr, text="Gestionnaire de Boutique v2",
-                     font=("Georgia",16,"bold"), fg=B, bg=G).pack()
+            logo_lbl = label("✦ Sophitek Studio", 16, True, BL)
+            slogan_lbl = label("Gestionnaire v3", 11, False, "rgba(255,255,255,0.7)")
+            left_h = QVBoxLayout()
+            left_h.setSpacing(2)
+            left_h.addWidget(logo_lbl)
+            left_h.addWidget(slogan_lbl)
+            hl.addLayout(left_h)
+            hl.addStretch()
 
-            body = tk.Frame(self.root, bg=N)
-            body.pack(fill="both", expand=True, padx=10, pady=8)
+            self.stat_lbl = label("", 12, False, "rgba(255,255,255,0.85)")
+            hl.addWidget(self.stat_lbl)
+            main.addWidget(header)
 
-            # Gauche — liste
-            left = tk.Frame(body, bg=G2, width=280)
-            left.pack(side="left", fill="y", padx=(0,10))
-            left.pack_propagate(False)
+            # ── CORPS
+            corps = QSplitter(Qt.Orientation.Horizontal)
+            corps.setStyleSheet("QSplitter::handle{background:#ede9fe;width:2px;}")
 
-            tk.Label(left, text="📦  CONTENUS", font=("Courier",10,"bold"),
-                     fg=R, bg=G2, pady=6).pack(fill="x", padx=8)
-            self.stats_lbl = tk.Label(left, text="", font=("Courier",8), fg=T, bg=G2, anchor="w")
-            self.stats_lbl.pack(fill="x", padx=8, pady=(0,4))
+            # Panneau gauche
+            left = QWidget()
+            left.setStyleSheet(f"background:{BL};")
+            left.setFixedWidth(280)
+            lv = QVBoxLayout(left)
+            lv.setContentsMargins(12,16,12,12)
+            lv.setSpacing(8)
 
-            ff = tk.Frame(left, bg=G2)
-            ff.pack(fill="x", padx=6, pady=2)
-            self.type_filtre = tk.StringVar(value="tous")
-            for lbl, val in [("Tous","tous")] + [(t[1],t[0]) for t in TYPES]:
-                tk.Radiobutton(ff, text=lbl, variable=self.type_filtre,
-                               value=val, command=self._charger,
-                               bg=G2, fg=T, selectcolor=R,
-                               activebackground=G2, font=("Courier",8)).pack(anchor="w", padx=4)
+            lv.addWidget(label("📦  Mes contenus", 13, True, V))
+            lv.addWidget(separateur())
 
-            sf = tk.Frame(left, bg=G2)
-            sf.pack(fill="both", expand=True, padx=6)
-            sb = ttk.Scrollbar(sf)
-            sb.pack(side="right", fill="y")
-            self.lb = tk.Listbox(sf, bg=G, fg=B, selectbackground=R,
-                                  font=("Georgia",11), borderwidth=0,
-                                  highlightthickness=0, activestyle="none",
-                                  yscrollcommand=sb.set, cursor="hand2")
-            self.lb.pack(side="left", fill="both", expand=True)
-            sb.config(command=self.lb.yview)
-            self.lb.bind("<<ListboxSelect>>", self._on_sel)
+            # Filtre type
+            self.filtre_type = QComboBox()
+            self.filtre_type.addItems(["Tous","📚 Livres","💻 Applications","🎵 Audios","🎬 Vidéos","📦 Autres"])
+            self.filtre_type.currentIndexChanged.connect(self._charger)
+            lv.addWidget(self.filtre_type)
 
-            bf = tk.Frame(left, bg=G2, pady=4)
-            bf.pack(fill="x", padx=6)
-            self._btn(bf,"＋ Nouveau",      self._nouveau,   V,  10).pack(fill="x",pady=2)
-            self._btn(bf,"✕ Supprimer",     self._supprimer, R,  10).pack(fill="x",pady=2)
-            self._btn(bf,"🗨 Commentaires", self._voir_coms, BL, 10).pack(fill="x",pady=2)
+            self.liste = QListWidget()
+            self.liste.itemClicked.connect(self._on_select)
+            lv.addWidget(self.liste)
 
-            # Droite — formulaire
-            right = tk.Frame(body, bg=N)
-            right.pack(side="left", fill="both", expand=True)
+            self.btn_nouveau   = btn("＋  Nouveau",    OR, BL)
+            self.btn_supprimer = btn("✕  Supprimer",   "#ef4444", BL)
+            self.btn_coms      = btn("🗨  Commentaires", V, BL)
+            self.btn_nouveau.clicked.connect(self._nouveau)
+            self.btn_supprimer.clicked.connect(self._supprimer)
+            self.btn_coms.clicked.connect(self._voir_coms)
+            lv.addWidget(self.btn_nouveau)
+            lv.addWidget(self.btn_supprimer)
+            lv.addWidget(self.btn_coms)
 
-            frm = tk.LabelFrame(right, text="  DÉTAILS  ",
-                                 font=("Courier",10), fg=R, bg=N,
-                                 bd=1, relief="solid", labelanchor="n")
-            frm.pack(fill="both", expand=True, pady=(0,6))
+            # Panneau droit
+            right = QWidget()
+            rv = QVBoxLayout(right)
+            rv.setContentsMargins(16,16,16,16)
+            rv.setSpacing(12)
+
+            tabs = QTabWidget()
+
+            # Tab 1 — Formulaire
+            form_tab = QWidget()
+            fv = QVBoxLayout(form_tab)
+            fv.setSpacing(10)
 
             # Type
-            tr = tk.Frame(frm, bg=N)
-            tr.pack(fill="x", padx=12, pady=4)
-            tk.Label(tr, text="Type *", font=("Courier",9), fg=T, bg=N, anchor="w").pack(fill="x")
-            self.type_var = tk.StringVar(value="livre")
-            type_row = tk.Frame(tr, bg=N)
-            type_row.pack(fill="x")
-            for lbl, val in TYPES:
-                tk.Radiobutton(type_row, text=lbl, variable=self.type_var,
-                               value=val, bg=N, fg=B, selectcolor=R,
-                               activebackground=N, font=("Courier",9)).pack(side="left", padx=4)
+            type_row = QHBoxLayout()
+            type_row.addWidget(label("Type:", 12, True, V))
+            self.type_combo = QComboBox()
+            self.type_combo.addItems(["livre","app","audio","video","autre"])
+            type_row.addWidget(self.type_combo)
+            type_row.addStretch()
+            self.cb_gratuit = QCheckBox("Accès gratuit")
+            self.cb_gratuit.setStyleSheet(f"color:{TX};font-size:13px;")
+            type_row.addWidget(self.cb_gratuit)
+            fv.addLayout(type_row)
 
-            self.flds = {}
-            self._field(frm,"titre",      "Titre *")
-            self._field(frm,"auteur",     "Auteur")
-            self._field(frm,"genre",      "Genre / Catégorie")
-            self._field(frm,"prix",       "Prix (FCFA) — 0 si gratuit")
-            self._field(frm,"lien_drive", "Lien Google Drive")
-            self._field(frm,"lien_media", "Lien audio / vidéo")
-            self._field(frm,"description","Description", multi=True)
-            self._field(frm,"extrait",    "Extrait lisible", multi=True)
+            # Champs
+            self.f = {}
+            champs = [
+                ("titre","Titre *"),("auteur","Auteur"),
+                ("genre","Genre / Catégorie"),("prix","Prix (FCFA)"),
+                ("lien_drive","Lien Google Drive"),("lien_media","Lien audio/vidéo"),
+            ]
+            grid = QGridLayout()
+            grid.setSpacing(8)
+            for i,(key,lbl) in enumerate(champs):
+                grid.addWidget(label(lbl,11,False,TD), i//2*2, (i%2)*2)
+                w = QLineEdit()
+                w.setPlaceholderText(lbl)
+                grid.addWidget(w, i//2*2+1, (i%2)*2)
+                self.f[key] = w
+            fv.addLayout(grid)
 
-            ex = tk.Frame(frm, bg=N)
-            ex.pack(fill="x", padx=12, pady=4)
-            self.grat_var = tk.BooleanVar()
-            tk.Checkbutton(ex, text="✓ Accès gratuit", variable=self.grat_var,
-                           bg=N, fg=B, selectcolor=R,
-                           activebackground=N, font=("Courier",10)).pack(side="left")
-            self._btn(ex,"🖼 Couverture", self._couverture, G3, 9).pack(side="left", padx=8)
-            tk.Label(ex, textvariable=self.cover_var,
-                     font=("Courier",8), fg=OR, bg=N).pack(side="left")
+            fv.addWidget(label("Description",11,False,TD))
+            self.f["description"] = QTextEdit()
+            self.f["description"].setFixedHeight(70)
+            fv.addWidget(self.f["description"])
 
-            sr = tk.Frame(frm, bg=N, pady=5)
-            sr.pack(fill="x", padx=12)
-            self._btn(sr,"💾  ENREGISTRER", self._enregistrer, V,  11).pack(side="left",padx=(0,6))
-            self._btn(sr,"✕  ANNULER",      self._vider,       G3, 11).pack(side="left")
+            fv.addWidget(label("Extrait lisible",11,False,TD))
+            self.f["extrait"] = QTextEdit()
+            self.f["extrait"].setFixedHeight(70)
+            fv.addWidget(self.f["extrait"])
 
-            # Actions
-            act = tk.LabelFrame(right, text="  ACTIONS  ",
-                                 font=("Courier",10), fg=R, bg=N,
-                                 bd=1, relief="solid", labelanchor="n")
-            act.pack(fill="x")
-            ai = tk.Frame(act, bg=N, pady=6)
-            ai.pack(fill="x", padx=10)
-            self._btn(ai,"🌐 PUBLIER",      self._publier,     R,  11).pack(side="left",padx=(0,6))
-            self._btn(ai,"⟳ SYNCHRONISER", self._sync,        BL, 11).pack(side="left",padx=(0,6))
-            self._btn(ai,"💾 SAUVEGARDER",  self._sauvegarder, OR, 11).pack(side="left",padx=(0,6))
-            self._btn(ai,"👁 APERÇU",       self._apercu,      G3, 11).pack(side="left",padx=(0,6))
-            self._btn(ai,"🔗 SITE EN LIGNE",self._site,        G3, 11).pack(side="left")
-            self.act_lbl = tk.Label(act, text="", font=("Courier",9), fg=V, bg=N, pady=3)
-            self.act_lbl.pack()
+            # Couverture
+            cov_row = QHBoxLayout()
+            self.cover_lbl = label("Aucune couverture", 11, False, TD)
+            btn_cov = btn("🖼  Couverture", VP, V, 12)
+            btn_cov.clicked.connect(self._choisir_cover)
+            cov_row.addWidget(btn_cov)
+            cov_row.addWidget(self.cover_lbl)
+            cov_row.addStretch()
+            fv.addLayout(cov_row)
 
+            # Enregistrer
+            sav_row = QHBoxLayout()
+            self.btn_save   = btn("💾  Enregistrer", "#16a34a", BL)
+            self.btn_cancel = btn("✕  Annuler", GC, TD, 12)
+            self.btn_save.clicked.connect(self._enregistrer)
+            self.btn_cancel.clicked.connect(self._vider)
+            sav_row.addWidget(self.btn_save)
+            sav_row.addWidget(self.btn_cancel)
+            sav_row.addStretch()
+            fv.addLayout(sav_row)
+            fv.addStretch()
+
+            tabs.addTab(form_tab, "✏️  Contenu")
+
+            # Tab 2 — Logo & Paramètres
+            logo_tab = QWidget()
+            lv2 = QVBoxLayout(logo_tab)
+            lv2.setContentsMargins(20,20,20,20)
+            lv2.setSpacing(16)
+
+            lv2.addWidget(label("Logo de la boutique", 15, True, V))
+            lv2.addWidget(label("Ce logo apparaîtra sur le site et dans la navbar.", 12, False, TD))
+            lv2.addWidget(separateur())
+
+            self.logo_preview = QLabel("Aucun logo sélectionné")
+            self.logo_preview.setFixedHeight(100)
+            self.logo_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.logo_preview.setStyleSheet(f"background:{VP};border-radius:12px;color:{TD};font-size:12px;")
+            if LOGO_PATH.exists():
+                px = QPixmap(str(LOGO_PATH)).scaled(100,100,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+                self.logo_preview.setPixmap(px)
+            lv2.addWidget(self.logo_preview)
+
+            btn_logo = btn("🖼  Choisir un logo", OR, BL)
+            btn_logo.clicked.connect(self._choisir_logo)
+            lv2.addWidget(btn_logo)
+            lv2.addStretch()
+
+            tabs.addTab(logo_tab, "🎨  Logo & Style")
+            rv.addWidget(tabs, stretch=1)
+
+            # ── BARRE D'ACTIONS
+            act = QGroupBox("Actions")
+            av = QVBoxLayout(act)
+            av.setSpacing(8)
+
+            row1 = QHBoxLayout()
+            self.btn_pub  = btn("🌐  PUBLIER SUR GITHUB", V, BL, 13)
+            self.btn_sync = btn("⟳  Synchroniser", VC, BL, 12)
+            self.btn_save2= btn("💾  Sauvegarder", OR, BL, 12)
+            self.btn_prev = btn("👁  Aperçu", GC, V, 12)
+            self.btn_site = btn("🔗  Site en ligne", GC, V, 12)
+            self.btn_pub.clicked.connect(self._publier)
+            self.btn_sync.clicked.connect(self._synchroniser)
+            self.btn_save2.clicked.connect(self._sauvegarder)
+            self.btn_prev.clicked.connect(self._apercu)
+            self.btn_site.clicked.connect(self._ouvrir_site)
+            for b in [self.btn_pub,self.btn_sync,self.btn_save2,self.btn_prev,self.btn_site]:
+                row1.addWidget(b)
+            av.addLayout(row1)
+
+            self.act_lbl = label("", 12, False, TD)
+            av.addWidget(self.act_lbl)
+            rv.addWidget(act)
+
+            corps.addWidget(left)
+            corps.addWidget(right)
+            corps.setSizes([280, 820])
+            main.addWidget(corps, stretch=1)
+
+        # ── LISTE
         def _charger(self):
-            self.lb.delete(0, tk.END)
-            t = self.type_filtre.get()
-            self.data = get_contenus(None if t == "tous" else t)
-            IC = {"livre":"📚","app":"💻","audio":"🎵","video":"🎬","autre":"📦"}
+            self.liste.clear()
+            idx = self.filtre_type.currentIndex()
+            types = [None,"livre","app","audio","video","autre"]
+            self.data = get_contenus(types[idx])
+            ICONS = {"livre":"📚","app":"💻","audio":"🎵","video":"🎬","autre":"📦"}
             for b in self.data:
-                ic  = IC.get(b["type"],"📦")
-                tag = "🆓" if b["gratuit"] else f"{b['prix']}F"
-                self.lb.insert(tk.END, f"  {ic} {b['titre']}  [{tag}]")
+                ic  = ICONS.get(b["type"],"📦")
+                tag = "🆓" if b["gratuit"] else f"{b['prix']:,} F"
+                item = QListWidgetItem(f"  {ic}  {b['titre']}  [{tag}]")
+                self.liste.addItem(item)
             s = get_stats()
-            self.stats_lbl.config(
-                text=f"  {s['total']} contenus · {s['ventes']} ventes · {s['revenus']:,} FCFA")
+            self.stat_lbl.setText(f"  {s['total']} contenus  ·  {s['gratuit']} gratuits  ·  {s['commentaires']} avis")
 
-        def _on_sel(self, _):
-            sel = self.lb.curselection()
-            if not sel: return
-            b = self.data[sel[0]]
+        def _on_select(self, item):
+            idx = self.liste.row(item)
+            if idx < 0 or idx >= len(self.data): return
+            b = self.data[idx]
             self.sel_id = b["id"]
-            self._vider()
-            self.type_var.set(b.get("type","livre"))
+            self._vider_champs()
+            self.type_combo.setCurrentText(b.get("type","livre"))
             for k in ["titre","auteur","genre","prix","lien_drive","lien_media"]:
-                self.flds[k].insert(0, str(b.get(k,"")))
-            self.flds["description"].insert("1.0", b.get("description",""))
-            self.flds["extrait"].insert("1.0", b.get("extrait",""))
-            self.grat_var.set(bool(b.get("gratuit",0)))
-            self.cover_var.set(b.get("couverture",""))
+                self.f[k].setText(str(b.get(k,"")))
+            self.f["description"].setPlainText(b.get("description",""))
+            self.f["extrait"].setPlainText(b.get("extrait",""))
+            self.cb_gratuit.setChecked(bool(b.get("gratuit",0)))
+            self.cover_path = b.get("couverture","")
+            self.cover_lbl.setText(self.cover_path or "Aucune couverture")
 
         def _vider(self):
             self.sel_id = None
-            for k, w in self.flds.items():
-                if isinstance(w, tk.Text): w.delete("1.0",tk.END)
-                else: w.delete(0, tk.END)
-            self.grat_var.set(False)
-            self.cover_var.set("")
-            self.type_var.set("livre")
+            self.liste.clearSelection()
+            self._vider_champs()
+
+        def _vider_champs(self):
+            self.sel_id = None
+            for k,w in self.f.items():
+                if isinstance(w, QTextEdit): w.clear()
+                else: w.clear()
+            self.cb_gratuit.setChecked(False)
+            self.cover_path = ""
+            self.cover_lbl.setText("Aucune couverture")
+            self.type_combo.setCurrentIndex(0)
 
         def _get_data(self):
-            try: prix = int(self.flds["prix"].get().strip() or "0")
+            try: prix = int(self.f["prix"].text().strip() or "0")
             except: prix = 0
             return {
-                "type":        self.type_var.get(),
-                "titre":       self.flds["titre"].get().strip(),
-                "auteur":      self.flds["auteur"].get().strip() or "Japhet Arcade Sophiano ASSOGBA",
-                "genre":       self.flds["genre"].get().strip(),
-                "description": self.flds["description"].get("1.0",tk.END).strip(),
-                "extrait":     self.flds["extrait"].get("1.0",tk.END).strip(),
+                "type":        self.type_combo.currentText(),
+                "titre":       self.f["titre"].text().strip(),
+                "auteur":      self.f["auteur"].text().strip() or "Japhet Arcade Sophiano ASSOGBA",
+                "genre":       self.f["genre"].text().strip(),
+                "description": self.f["description"].toPlainText().strip(),
+                "extrait":     self.f["extrait"].toPlainText().strip(),
                 "prix":        prix,
-                "gratuit":     int(self.grat_var.get()),
-                "couverture":  self.cover_var.get(),
-                "lien_drive":  self.flds["lien_drive"].get().strip(),
-                "lien_media":  self.flds["lien_media"].get().strip(),
+                "gratuit":     int(self.cb_gratuit.isChecked()),
+                "couverture":  self.cover_path,
+                "lien_drive":  self.f["lien_drive"].text().strip(),
+                "lien_media":  self.f["lien_media"].text().strip(),
             }
 
         def _nouveau(self):
             self._vider()
-            self.flds["titre"].focus()
+            self.f["titre"].setFocus()
 
         def _enregistrer(self):
             d = self._get_data()
             if not d["titre"]:
-                messagebox.showerror("Erreur","Le titre est obligatoire."); return
+                QMessageBox.warning(self,"Erreur","Le titre est obligatoire."); return
             if self.sel_id:
                 update_contenu(self.sel_id, d)
-                messagebox.showinfo("✓", f"Modifié : {d['titre']}")
+                QMessageBox.information(self,"✓",f"Modifié : {d['titre']}")
             else:
                 add_contenu(d)
-                messagebox.showinfo("✓", f"Ajouté : {d['titre']}")
-            self._vider()
-            self._charger()
+                QMessageBox.information(self,"✓",f"Ajouté : {d['titre']}")
+            self._vider(); self._charger()
 
         def _supprimer(self):
-            sel = self.lb.curselection()
-            if not sel or not self.sel_id:
-                messagebox.showinfo("Info","Sélectionne un contenu."); return
-            titre = self.data[sel[0]]["titre"]
-            if messagebox.askyesno("Confirmer", f"Supprimer « {titre} » ?"):
+            sel = self.liste.currentRow()
+            if sel < 0 or not self.sel_id:
+                QMessageBox.information(self,"Info","Sélectionne un contenu."); return
+            titre = self.data[sel]["titre"]
+            rep = QMessageBox.question(self,"Confirmer",f"Supprimer « {titre} » ?")
+            if rep == QMessageBox.StandardButton.Yes:
                 delete_contenu(self.sel_id)
-                self._vider()
-                self._charger()
+                self._vider(); self._charger()
 
-        def _couverture(self):
-            path = filedialog.askopenfilename(
-                title="Choisir une image",
-                filetypes=[("Images","*.jpg *.jpeg *.png *.webp")])
+        def _choisir_cover(self):
+            path,_ = QFileDialog.getOpenFileName(self,"Choisir une couverture",
+                "","Images (*.jpg *.jpeg *.png *.webp)")
             if path:
                 nom  = Path(path).name
                 dest = COVERS_DIR / nom
                 shutil.copy2(path, dest)
-                self.cover_var.set(f"covers/{nom}")
+                self.cover_path = f"covers/{nom}"
+                self.cover_lbl.setText(self.cover_path)
+
+        def _choisir_logo(self):
+            path,_ = QFileDialog.getOpenFileName(self,"Choisir un logo",
+                "","Images (*.jpg *.jpeg *.png *.webp)")
+            if path:
+                shutil.copy2(path, LOGO_PATH)
+                px = QPixmap(str(LOGO_PATH)).scaled(100,100,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation)
+                self.logo_preview.setPixmap(px)
+                QMessageBox.information(self,"✓","Logo mis à jour ! Clique Publier pour l'envoyer sur le site.")
 
         def _voir_coms(self):
             if not self.sel_id:
-                messagebox.showinfo("Info","Sélectionne un contenu d'abord."); return
-            win = tk.Toplevel(self.root)
-            win.title("Commentaires")
-            win.geometry("500x400")
-            win.configure(bg=N)
+                QMessageBox.information(self,"Info","Sélectionne un contenu d'abord."); return
             coms = get_commentaires(self.sel_id)
-            tk.Label(win, text=f"Commentaires ({len(coms)})",
-                     font=("Georgia",14,"bold"), fg=R, bg=N, pady=10).pack()
-            sf = tk.Frame(win, bg=N)
-            sf.pack(fill="both", expand=True, padx=10, pady=5)
-            sb = ttk.Scrollbar(sf)
-            sb.pack(side="right", fill="y")
-            lb = tk.Listbox(sf, bg=G, fg=B, font=("Georgia",11),
-                            borderwidth=0, highlightthickness=0, yscrollcommand=sb.set)
-            lb.pack(side="left", fill="both", expand=True)
-            sb.config(command=lb.yview)
-            for cm in coms:
-                lb.insert(tk.END, f"  {cm['nom']} ({cm['date_com'][:10]}) : {cm['texte'][:60]}")
+            dlg = QDialog(self)
+            dlg.setWindowTitle("Commentaires")
+            dlg.setMinimumSize(500,400)
+            dlg.setStyleSheet(STYLE)
+            v = QVBoxLayout(dlg)
+            v.addWidget(label(f"Commentaires ({len(coms)})",14,True,V))
+            lb = QListWidget()
+            for c in coms:
+                lb.addItem(f"  {c['nom']} ({c['date_com'][:10]}) : {c['texte'][:60]}")
+            v.addWidget(lb)
             def sup():
-                sel2 = lb.curselection()
-                if not sel2: return
-                if messagebox.askyesno("Confirmer","Supprimer ce commentaire ?"):
-                    delete_commentaire(coms[sel2[0]]["id"])
-                    lb.delete(sel2[0])
-            self._btn(win,"✕ Supprimer", sup, R, 11).pack(pady=6)
+                idx = lb.currentRow()
+                if idx < 0: return
+                rep = QMessageBox.question(dlg,"Confirmer","Supprimer ce commentaire ?")
+                if rep == QMessageBox.StandardButton.Yes:
+                    delete_commentaire(coms[idx]["id"])
+                    lb.takeItem(idx)
+            b_sup = btn("✕  Supprimer", "#ef4444", BL)
+            b_sup.clicked.connect(sup)
+            v.addWidget(b_sup)
+            dlg.exec()
 
         def _apercu(self):
-            html = generer_html(get_contenus())
-            HTML_PATH.write_text(html, encoding="utf-8")
+            exporter_json()
             import webbrowser
             webbrowser.open(str(HTML_PATH))
 
-        def _site(self):
+        def _ouvrir_site(self):
             import webbrowser
             webbrowser.open(CONFIG["SITE_URL"])
 
         def _publier(self):
-            self.act_lbl.config(text="⏳ Publication en cours...", fg=OR)
-            self.root.update()
-            def cb(msgs, errors):
+            self.btn_pub.setEnabled(False)
+            self.act_lbl.setStyleSheet(f"color:{OR};")
+            self.act_lbl.setText("⏳  Publication en cours...")
+            exporter_json()
+            self.pub_thread = PublierThread()
+            def on_done(msgs, errors):
+                self.btn_pub.setEnabled(True)
                 if errors and not msgs:
-                    self.act_lbl.config(text=f"✗ Échec : {errors[0]}", fg=R)
-                    messagebox.showerror("Erreur", "\n".join(errors[:3]))
+                    self.act_lbl.setStyleSheet("color:#ef4444;")
+                    self.act_lbl.setText(f"✗  Échec : {errors[0]}")
+                    QMessageBox.critical(self,"Erreur","\n".join(errors[:3]))
                 else:
-                    self.act_lbl.config(text=f"✓ Publié — {len(msgs)} fichier(s)", fg=V)
-                    messagebox.showinfo("✓ Succès !",
+                    self.act_lbl.setStyleSheet(f"color:#16a34a;")
+                    self.act_lbl.setText(f"✓  Publié ! {len(msgs)} fichier(s) mis à jour")
+                    QMessageBox.information(self,"✓  Succès !",
                         f"Site mis à jour !\n\nVisible dans 1-2 min sur :\n{CONFIG['SITE_URL']}")
                 self._charger()
-            threading.Thread(target=publier_site, args=(cb,), daemon=True).start()
+            self.pub_thread.termine.connect(on_done)
+            self.pub_thread.start()
 
-        def _sync(self):
-            if not messagebox.askyesno("Synchroniser",
-                "Mettre l'app à jour depuis GitHub ?\nLes contenus locaux seront mis à niveau."):
-                return
-            self.act_lbl.config(text="⏳ Synchronisation...", fg=OR)
-            self.root.update()
-            def cb(ok, msg):
-                self.act_lbl.config(text=msg, fg=V if ok else R)
+        def _synchroniser(self):
+            rep = QMessageBox.question(self,"Synchroniser",
+                "Mettre l'app à jour depuis GitHub ?")
+            if rep != QMessageBox.StandardButton.Yes: return
+            self.act_lbl.setStyleSheet(f"color:{OR};")
+            self.act_lbl.setText("⏳  Synchronisation...")
+            self.sync_thread = SyncThread()
+            def on_done(ok, msg):
+                self.act_lbl.setStyleSheet(f"color:{'#16a34a' if ok else '#ef4444'};")
+                self.act_lbl.setText(msg)
                 if ok:
-                    messagebox.showinfo("✓", msg)
+                    QMessageBox.information(self,"✓",msg)
                     self._charger()
                 else:
-                    messagebox.showerror("Erreur", msg)
-            threading.Thread(target=synchroniser, args=(cb,), daemon=True).start()
+                    QMessageBox.critical(self,"Erreur",msg)
+            self.sync_thread.termine.connect(on_done)
+            self.sync_thread.start()
 
         def _sauvegarder(self):
-            self.act_lbl.config(text="⏳ Sauvegarde...", fg=OR)
-            self.root.update()
-            def cb(ok, msg):
-                self.act_lbl.config(text=msg, fg=V if ok else R)
+            self.act_lbl.setStyleSheet(f"color:{OR};")
+            self.act_lbl.setText("⏳  Sauvegarde...")
+            self.save_thread = SaveThread()
+            def on_done(ok, msg):
+                self.act_lbl.setStyleSheet(f"color:{'#16a34a' if ok else '#ef4444'};")
+                self.act_lbl.setText(msg)
                 if ok:
-                    messagebox.showinfo("✓ Sauvegardé",
-                        "Fichier Python sauvegardé dans :\nsophitekstudio/bibliotheque-sophitek/backup/")
+                    QMessageBox.information(self,"✓  Sauvegardé",
+                        "Fichier Python sauvegardé sur GitHub\ndans le dossier backup/")
                 else:
-                    messagebox.showerror("Erreur", msg)
-            threading.Thread(target=sauvegarder, args=(cb,), daemon=True).start()
+                    QMessageBox.critical(self,"Erreur",msg)
+            self.save_thread.termine.connect(on_done)
+            self.save_thread.start()
 
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
 # POINT D'ENTRÉE
-# ════════════════════════════════════════════════════════════
+# ════════════════════════════════════════
 if __name__ == "__main__":
     init_db()
     if ON_RENDER:
-        # Sur Render : Flask uniquement
-        logging.info("Démarrage en mode serveur (Render)")
+        logging.info("Mode serveur Render")
         demarrer_flask()
     else:
-        # Sur PC : Tkinter + Flask en arrière-plan
-        logging.info("Démarrage en mode gestionnaire (PC)")
-        root = tk.Tk()
-        App(root)
-        root.mainloop()
+        logging.info("Mode gestionnaire PC")
+        app = QApplication(sys.argv)
+        app.setStyle("Fusion")
+        window = SophitekApp()
+        window.show()
+        sys.exit(app.exec())
