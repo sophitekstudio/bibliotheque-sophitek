@@ -1,4 +1,20 @@
 {
   "logo": "logo.png",
-  "contenus": []
+  "contenus": [
+    {
+      "id": 1,
+      "type": "livre",
+      "titre": "ba",
+      "auteur": "ajas",
+      "genre": "étude",
+      "description": "",
+      "couverture": "covers/image_2ae54ee4-650a-4d14-8e8e-d76858b52e4a.jpeg",
+      "lien_drive": "https://drive.google.com/file/d/1R6x-kkJy-kYVa2vSfofQ7_-jbfTFbiFu/view?usp=drive_link",
+      "lien_media": "",
+      "protege": false,
+      "mdp_hash": "",
+      "actif": 1,
+      "date_ajout": "2026-04-26"
+    }
+  ]
 }
