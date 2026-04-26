@@ -1,18 +1,4 @@
-[
-  {
-    "id": 1,
-    "type": "📦 Autre",
-    "titre": "sophitek studio",
-    "auteur": "JAPHET",
-    "genre": "WEB",
-    "description": "",
-    "extrait": "",
-    "prix": 0,
-    "gratuit": true,
-    "couverture": "covers/image_aec67c31-00a9-4dcc-b301-fd53b2633155.jpeg",
-    "lien_drive": "",
-    "lien_media": "",
-    "actif": 1,
-    "date_ajout": "2026-03-17"
-  }
-]
+{
+  "logo": "logo.png",
+  "contenus": []
+}
