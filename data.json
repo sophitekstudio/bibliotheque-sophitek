@@ -2,7 +2,7 @@
   "logo": "logo.png",
   "contenus": [
     {
-      "id": 1,
+      "id": 2,
       "type": "livre",
       "titre": "ba",
       "auteur": "ajas",
@@ -11,8 +11,8 @@
       "couverture": "covers/image_2ae54ee4-650a-4d14-8e8e-d76858b52e4a.jpeg",
       "lien_drive": "https://drive.google.com/file/d/1R6x-kkJy-kYVa2vSfofQ7_-jbfTFbiFu/view?usp=drive_link",
       "lien_media": "",
-      "protege": false,
-      "mdp_hash": "",
+      "protege": true,
+      "mdp_hash": "980144e66414d1b752ed4e8c3159876ebcc623e611b97d05be8b099518ff08be",
       "actif": 1,
       "date_ajout": "2026-04-26"
     }
