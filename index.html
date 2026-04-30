@@ -317,8 +317,12 @@ function afficher(export_) {
   if(logo) {
     const nl = document.getElementById("nav-logo");
     const hl = document.getElementById("hero-logo");
-    nl.innerHTML = `<img src="${logo}" style="width:40px;height:40px;border-radius:10px;object-fit:cover"/>`;
-    hl.innerHTML = `<img src="${logo}" class="hero-logo"/>`;
+    // Convertir lien Drive en lien image direct si nécessaire
+    const logoUrl = logo.match(/\/d\/([a-zA-Z0-9_-]+)/)
+      ? `https://drive.google.com/thumbnail?id=${logo.match(/\/d\/([a-zA-Z0-9_-]+)/)[1]}&sz=w200`
+      : logo;
+    nl.innerHTML = `<img src="${logoUrl}" style="width:40px;height:40px;border-radius:10px;object-fit:cover"/>`;
+    hl.innerHTML = `<img src="${logoUrl}" class="hero-logo"/>`;
   }
 
   document.getElementById("s-total").textContent = actifs.length;
@@ -354,8 +358,13 @@ function afficher(export_) {
   }
 
   actifs.forEach(b => {
+    const driveImg = (url) => {
+      if (!url) return "";
+      const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400` : url;
+    };
     const cover = b.couverture
-      ? `<img src="${b.couverture}" alt="${b.titre}" loading="lazy"/>`
+      ? `<img src="${driveImg(b.couverture)}" alt="${b.titre}" loading="lazy"/>`
       : `<div class="cover-ph">${ICONS[b.type]||"📦"}</div>`;
     const lockBadge = b.protege ? `<span class="lock-badge">🔒</span>` : "";
     const lien = b.lien_media || b.lien_drive || "";
